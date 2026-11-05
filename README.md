@@ -166,6 +166,7 @@ This software can operate your computer by voice. The defaults are conservative:
 - Risky actions need an explicit spoken confirmation: payments, deploys, `git push`, deleting, sending messages, computer use.
 - Destructive shell commands and sensitive paths (`~/.ssh`, the Keychain, `.env`; on Linux also the keyring files) are blocked for the hub's own agent.
 - On Linux the hub's agent types text only by pasting it through the clipboard and puts your clipboard back afterwards; select-all (Ctrl+A) and cut (Ctrl+X) are blocked for it, and it fixes mistakes only with undo (Ctrl+Z).
+- **Locked phone = ask only.** While the phone is on its lock screen (PIN, Face ID or pattern set), anyone holding it can talk to Claude, so the hub only lets them ask: session status and questions work, but instructing sessions, approving permissions, starting sessions and computer use need the phone unlocked first. Denying a permission and the emergency stop always work.
 - Web page content is treated as data, never as instructions.
 - Everything goes into an append-only audit log in `~/.callmeclaude/audit`.
 

@@ -124,10 +124,27 @@ const HIGH_RISK =
 const WRAP_UP = {
   next: 'If nothing else is open, say in one short sentence that you will call back when it is done, say goodbye and call end_call in the same turn.',
 };
+/** Tools that change something: refused while the phone is on its lock screen (anyone holding it could talk). */
+const NEEDS_UNLOCK = new Set(['reply_to_session', 'answer_permission', 'start_session', 'computer_task', 'auto_approve', 'resume_hub', 'release_session']);
+const LOCKED = {
+  error: 'phone_locked',
+  say: 'The phone is locked. Ask the developer to unlock it (Face ID / PIN) and then say it again; nothing was done.',
+};
+
+/** Read-only and safety tools still work on the lock screen; denying a permission is always allowed. */
+export function needsUnlock(name: string, args: any) {
+  if (name === 'answer_permission') return !!args?.approve;
+  return NEEDS_UNLOCK.has(name);
+}
+
 const needConfirm = (what: string) => ({ needs_confirmation: true, say: `Ask the developer for explicit confirmation first: ${what}` });
 
-export async function runTool(hub: Hub, name: string, args: any, ctx: { endCall: () => void }): Promise<Record<string, unknown>> {
+export async function runTool(hub: Hub, name: string, args: any, ctx: { endCall: () => void; locked?: () => boolean }): Promise<Record<string, unknown>> {
   audit('voice.tool', { name, args });
+  if (ctx.locked?.() && needsUnlock(name, args)) {
+    audit('voice.tool.locked', { name });
+    return LOCKED;
+  }
   const find = (p: string) => hub.st.findSession(p);
   const projects = () => hub.st.activeSessions().map((x) => x.project);
   switch (name) {

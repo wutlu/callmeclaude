@@ -54,6 +54,27 @@ final class HubClient: NSObject, ObservableObject {
         nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) { [weak self] _ in
             self?.appActive.value = false
         }
+        // Lock screen: with a passcode, protected data goes away shortly after locking and comes back on unlock.
+        // While locked the hub lets the voice agent answer questions but not change anything.
+        nc.addObserver(forName: UIApplication.protectedDataWillBecomeUnavailableNotification, object: nil, queue: nil) { [weak self] _ in
+            self?.setLocked(true)
+        }
+        nc.addObserver(forName: UIApplication.protectedDataDidBecomeAvailableNotification, object: nil, queue: nil) { [weak self] _ in
+            self?.setLocked(false)
+        }
+        DispatchQueue.main.async { self.setLocked(!UIApplication.shared.isProtectedDataAvailable) }
+    }
+
+    /// Last known lock state (q-confined); re-sent after every hello.
+    private var locked: Bool?
+
+    private func setLocked(_ value: Bool) {
+        q.async {
+            guard self.locked != value else { return }
+            self.locked = value
+            Log.d("lock: \(value)")
+            if self.isConnected { self.sendJSON(["type": "device.lock", "locked": value]) }
+        }
     }
 
     // MARK: connection
@@ -263,6 +284,7 @@ final class HubClient: NSObject, ObservableObject {
                     self.flushWaiters(true)
                     self.registerPush()
                     self.flushLogs()
+                    if let l = self.locked { self.sendJSON(["type": "device.lock", "locked": l]) }
                     self.startPing()
                     self.onConnected?()
                 }

@@ -176,6 +176,9 @@ object AppMessages {
     fun resume(): String = JSONObject().put("type", "resume").toString()
     fun ping(): String = JSONObject().put("type", "ping").toString()
 
+    /** The secure lock screen is showing: the hub then refuses voice actions that change anything. */
+    fun deviceLock(locked: Boolean): String = JSONObject().put("type", "device.lock").put("locked", locked).toString()
+
     /** Diagnostics for the hub's app log (packages/protocol: `{ type: 'log'; lines: string[] }`). */
     fun log(lines: List<String>): String = JSONObject().put("type", "log").put("lines", JSONArray(lines)).toString()
 

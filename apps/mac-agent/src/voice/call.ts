@@ -19,6 +19,8 @@ export interface CallSink {
   id: string;
   audio(pcm24k: Buffer): void;
   json(msg: HubToApp): void;
+  /** True while the phone is on its lock screen: no actions that change anything. */
+  locked?(): boolean;
 }
 
 /**
@@ -61,7 +63,8 @@ export class VoiceCall {
       this.direction === 'outbound'
         ? `[SYSTEM] YOU called the developer and they picked up. Greet briefly (e.g. "Hi, it's Claude."), then go through the first agenda item and ask.`
         : `[SYSTEM] The developer called you. Greet briefly, sum up the state in one sentence (how many sessions, anything pending) and ask what they want to do.`;
-    this.send(`${opening}\n\nCURRENT STATE:\n${briefing(this.hub, this.agenda)}`);
+    const lock = this.sink.locked?.() ? '\n\nTHE PHONE IS LOCKED: you can report status and answer questions, but anything that changes something needs the developer to unlock the phone first.' : '';
+    this.send(`${opening}\n\nCURRENT STATE:\n${briefing(this.hub, this.agenda)}${lock}`);
     this.watchdog = setInterval(() => this.checkSilence(), 2000);
   }
 
@@ -213,7 +216,7 @@ export class VoiceCall {
     this.lastActivity = Date.now();
     let response: Record<string, unknown>;
     try {
-      response = await runTool(this.hub, name, args, { endCall: () => (this.ending = true) });
+      response = await runTool(this.hub, name, args, { endCall: () => (this.ending = true), locked: () => this.sink.locked?.() ?? false });
     } catch (e) {
       response = { error: (e as Error).message };
     }

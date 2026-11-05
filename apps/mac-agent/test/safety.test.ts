@@ -44,3 +44,21 @@ test('stop all (panic) by voice needs an explicit confirmation', async () => {
   await runTool(hub, 'stop', { target: 'all', confirmed: true }, { endCall() {} });
   assert.deepEqual(calls, ['panic:voice']);
 });
+
+test('a locked phone can ask but not change anything', async () => {
+  const { hub } = fakeHub();
+  const locked = { endCall() {}, locked: () => true };
+  for (const [name, args] of [
+    ['reply_to_session', { project: 'x', instruction: 'deploy' }],
+    ['computer_task', { task: 't', goal: 'g', confirmed: true }],
+    ['start_session', { project: 'x', task: 't', confirmed: true }],
+    ['answer_permission', { project: 'x', approve: true }],
+    ['auto_approve', { project: 'x', rule: 'npm', confirmed: true }],
+    ['resume_hub', { confirmed: true }],
+  ] as const)
+    assert.equal(((await runTool(hub, name, args, locked)) as any).error, 'phone_locked', name);
+  // Denying a permission and the emergency stop still work; unlocked phones are unaffected.
+  assert.notEqual(((await runTool(hub, 'answer_permission', { project: 'x', approve: false }, locked)) as any).error, 'phone_locked');
+  assert.notEqual(((await runTool(hub, 'reply_to_session', { project: 'x', instruction: 'go' }, { endCall() {}, locked: () => false })) as any).error, 'phone_locked');
+  assert.equal(((await runTool(hub, 'stop', { target: 'all', confirmed: true }, locked)) as any).ok, true);
+});

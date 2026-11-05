@@ -21,6 +21,8 @@ interface Client {
   ws: WebSocket;
   device: string;
   callId?: string;
+  /** Last lock state the phone reported; while locked the voice agent may not change anything. */
+  locked?: boolean;
 }
 
 /** Phone-facing WebSocket server (bind on all interfaces; reach it via Tailscale on the road). */
@@ -155,8 +157,18 @@ export class AppServer {
           id: c.id,
           audio: (pcm) => c.ws.readyState === WebSocket.OPEN && c.ws.send(pcm, { binary: true }),
           json: (m) => send(m),
+          locked: () => c.locked === true,
         });
         if (!resumed) send({ type: 'call.ready', callId });
+        return;
+      }
+      case 'device.lock': {
+        const was = c.locked === true;
+        c.locked = msg.locked === true;
+        if (was !== c.locked) audit('app.lock', { device: c.device, locked: c.locked });
+        // Unlocked mid-call: an action refused while locked can go ahead now.
+        if (was && !c.locked && this.hub.voice.active?.sinkId === c.id)
+          this.hub.voice.active.inject('The phone is unlocked now: an action that was refused because the phone was locked can be done if the developer still wants it (ask them to confirm again).', 'now');
         return;
       }
       case 'call.end':

@@ -16,6 +16,7 @@
 | `call.end` | `callId` | Kapat / reddet |
 | `mode.set` | `mode` | desk · away · ride · sleep |
 | `pending.resolve` | `pendingId`, `decision`, `note?` | Ekrandan onay/ret/bırak |
+| `device.lock` | `locked` | Kilit ekranı açık mı; bağlanınca ve her değişimde. Kilitliyken sesli asistan yalnızca sorulara cevap verir, değişiklik yapamaz |
 | `panic` / `resume` / `ping` | | |
 
 ## Hub → App

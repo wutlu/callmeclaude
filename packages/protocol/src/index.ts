@@ -75,6 +75,8 @@ export type AppToHub =
   | { type: 'push.register'; token: string; kind: 'voip' }
   | { type: 'pending.resolve'; pendingId: string; decision: 'approve' | 'deny' | 'release'; note?: string }
   | { type: 'ping' }
+  /** The phone's screen lock (secure lock screen showing). Sent on connect and on every change; absent = unknown (treated as unlocked). */
+  | { type: 'device.lock'; locked: boolean }
   | { type: 'log'; lines: string[] };
 
 /** Contents of the VoIP push. Kept minimal: details are fetched over the tailnet. */

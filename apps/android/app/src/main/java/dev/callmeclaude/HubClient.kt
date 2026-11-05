@@ -368,6 +368,7 @@ class HubClient(
                 _status.value = "Connected to ${_pairing.value?.name ?: "computer"}"
                 flushWaiters(true)
                 flushLogs()
+                locked?.let { task?.send(AppMessages.deviceLock(it)) }
                 onConnected?.invoke()
             }
             is HubMessage.SnapshotUpdate -> msg.snapshot?.let { _snapshot.value = it }
@@ -393,6 +394,17 @@ class HubClient(
 
     fun sendJSON(text: String) {
         task?.send(text)
+    }
+
+    /** Last known lock state; re-sent after every hello so a reconnected hub knows it too. */
+    @Volatile private var locked: Boolean? = null
+
+    /** The phone's secure lock screen came or went (see [LockWatcher]). Any thread. */
+    fun setLocked(value: Boolean) {
+        if (locked == value) return
+        locked = value
+        AppLog.i(TAG, "lock: $value")
+        sendJSON(AppMessages.deviceLock(value))
     }
 
     /** Microphone audio. Thread-safe; dropped while there is no connection (the hub keeps the call 20 s). */
