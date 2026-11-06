@@ -7,7 +7,7 @@ TypeScript (Node 22.5+), `tsx` ile kaynak koddan çalışır. launchd servisi (L
 | `src/hookServer.ts` | Claude Code HTTP hook'ları (127.0.0.1:47800). `Stop` ve `PermissionRequest` olaylarını **açık tutar** (hold), geliştirici cevap verince yanıtlar. Ayrıca `cmc` için `/control/*` API'si. |
 | `src/state.ts` | Oturum kayıtları, bekleyen kararlar, hold'lar, kuyruktaki talimatlar (`~/.callmeclaude/state.json`) |
 | `src/classifier.ts` | Duran oturumu sınıflandırır: regex + Claude Haiku (kullanıcının kendi planı, Agent SDK) |
-| `src/controller.ts` | Talimat iletme: hold yanıtı → tmux send-keys → `claude -p --resume` → kuyruk (sonraki hook'ta `additionalContext`) |
+| `src/controller.ts` | Talimat iletme: hold yanıtı → tmux send-keys → `claude -p --resume` → meşgul oturum için kuyruk (sonraki hook'ta `additionalContext`) → boştaki oturum için `--fork-session` ile headless kopya |
 | `src/calls.ts`, `src/apns.ts` | Ne zaman aranacağı (öncelik, toplama, modlar, tekrar) + doğrudan APNs VoIP push |
 | `src/voice/` | Gemini Live köprüsü, ses modeli araçları, telefon dostu sistem prompt'u ve brifing |
 | `src/brain.ts` | Claude Agent SDK: bilgisayar görevleri (Claude in Chrome + Peekaboo + cliclick; Linux'ta masaüstüne göre scrot/spectacle/grim + xdotool/ydotool) ve transcript soruları |

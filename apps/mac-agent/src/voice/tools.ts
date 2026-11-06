@@ -163,12 +163,14 @@ export async function runTool(hub: Hub, name: string, args: any, ctx: { endCall:
       if ((HIGH_RISK.test(args.instruction) || pend?.risk === 'high' || pend?.risk === 'critical') && !args.confirmed) return needConfirm(args.instruction);
       const via = await hub.controller.instruct(s, args.instruction);
       const callBack = args.call_back !== false && via !== 'none';
-      if (callBack) hub.st.addCallback({ sessionId: s.id });
+      // A fork has its own session id; the callback follows the session that does the work.
+      if (callBack) hub.st.addCallback({ sessionId: via === 'fork' ? hub.controller.forks.get(s.id) ?? s.id : s.id });
       const msg = {
         hold: 'Instruction delivered; the agent is continuing.',
         tmux: 'Instruction typed into the terminal.',
         resume: 'The session had ended; it was restarted with the instruction.',
-        queue: 'The session is busy; the instruction will be delivered at the next opportunity.',
+        fork: 'The session was idle at the computer, so a background copy of it (same conversation) is doing this now. Its open window on the computer will not show this work.',
+        queue: 'The session is busy; the instruction will be delivered at its next step.',
         none: 'Could not deliver the instruction.',
       }[via];
       return { ok: via !== 'none', delivered_via: via, call_back: callBack, say: callBack ? `${msg} I'll call when it's done.` : msg, ...(callBack ? WRAP_UP : {}) };

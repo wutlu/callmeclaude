@@ -6,7 +6,7 @@ import { inProjectRoots, voiceSessionMode, type Config } from './config.ts';
 import { norm, type Pending, type Session, type State } from './state.ts';
 import { audit, execFileP, log } from './util.ts';
 
-export type Delivery = 'hold' | 'tmux' | 'resume' | 'queue' | 'none';
+export type Delivery = 'hold' | 'tmux' | 'resume' | 'fork' | 'queue' | 'none';
 
 const PREFIX = 'The developer said by phone (via CallMeClaude): ';
 
@@ -15,16 +15,34 @@ export function headlessStartArgs(sessionId: string, task: string): string[] {
   return ['-p', '--session-id', sessionId, '--permission-mode', 'acceptEdits', task];
 }
 
+/** argv for a headless copy of an idle session: same conversation, new id fixed up front (so a callback can bind to it). */
+export function forkArgs(sessionId: string, forkId: string, text: string): string[] {
+  return ['-p', '--resume', sessionId, '--fork-session', '--session-id', forkId, '--permission-mode', 'acceptEdits', PREFIX + text];
+}
+
 /**
  * Gets developer instructions into Claude Code sessions, trying in order:
  *  1. answer a held-open Stop hook with decision=block (Claude continues with our reason)
  *  2. tmux send-keys into the pane the session runs in
  *  3. headless `claude -p --resume` if the session process has ended
- *  4. queue for the session's next hook event
+ *  4. busy session: queue for its next hook event
+ *  5. idle session nobody can type into (IDE / desktop app, hold expired): a headless fork of its conversation.
+ *     Queuing here would wait until the developer types at the computer, i.e. never while they are away.
  */
 export class Controller {
   /** Headless sessions this hub started, by session id (Linux without tmux). */
   private headless = new Map<string, ChildProcess>();
+  /** Idle session id → the headless fork that carries its latest phone instruction. */
+  readonly forks = new Map<string, string>();
+  /** Starts the claude CLI detached; replaced in tests. */
+  spawnClaude = (args: string[], cwd: string): ChildProcess => {
+    // No TMUX_PANE: if the hub itself runs inside tmux, the hooks must not report the hub's pane for this session.
+    const { TMUX: _t, TMUX_PANE: _p, ...env } = process.env;
+    const child = spawn('claude', args, { cwd, detached: true, stdio: 'ignore', env });
+    child.on('error', (e) => log.warn('claude failed to start', cwd, e.message));
+    child.unref();
+    return child;
+  };
 
   constructor(
     private st: State,
@@ -73,6 +91,16 @@ export class Controller {
       this.resumeHeadless(s, text);
       this.mark(s, 'running', 'Session resumed, working.');
       return 'resume';
+    }
+    if (s.state !== 'running') {
+      const forkId = randomUUID();
+      this.spawnClaude(forkArgs(s.id, forkId, text), s.cwd);
+      this.forks.set(s.id, forkId);
+      this.st.upsertSession(forkId, s.cwd, { state: 'running', summary: 'Instruction delivered, working.', lastPrompt: s.lastPrompt });
+      // The project name now means the fork; the idle window comes back on its next hook if the developer types there.
+      this.mark(s, 'ended', 'Continued in a background copy (phone instruction).');
+      audit('session.fork', { session: s.id, fork: forkId, text });
+      return 'fork';
     }
     const q = this.st.queued.get(s.id) ?? [];
     q.push(text);
@@ -195,12 +223,8 @@ export class Controller {
       throw new Error(`Not starting a session in ${dir}: it is outside the configured project roots.`);
     }
     const id = randomUUID();
-    // No TMUX_PANE: if the hub itself runs inside tmux, the hooks must not report the hub's pane for this session.
-    const { TMUX: _t, TMUX_PANE: _p, ...env } = process.env;
-    const child = spawn('claude', headlessStartArgs(id, task), { cwd: dir, detached: true, stdio: 'ignore', env });
-    child.on('error', (e) => log.warn('headless session failed to start', dir, e.message));
+    const child = this.spawnClaude(headlessStartArgs(id, task), dir);
     child.on('exit', () => this.headless.delete(id));
-    child.unref();
     this.headless.set(id, child);
     audit('session.start', { dir, task, headless: id, pid: child.pid });
     return id;
@@ -220,12 +244,7 @@ export class Controller {
   }
 
   private resumeHeadless(s: Session, text: string) {
-    const child = spawn('claude', ['-p', '--resume', s.id, '--permission-mode', 'acceptEdits', PREFIX + text], {
-      cwd: s.cwd,
-      detached: true,
-      stdio: 'ignore',
-    });
-    child.unref();
+    this.spawnClaude(['-p', '--resume', s.id, '--permission-mode', 'acceptEdits', PREFIX + text], s.cwd);
     audit('session.resume', { session: s.id, text });
   }
 

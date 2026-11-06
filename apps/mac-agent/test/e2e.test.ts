@@ -19,9 +19,15 @@ writeFileSync(
 if (!process.env.CMC_TEST_LIVE) process.env.CMC_CLASSIFY_OFFLINE = '1';
 
 let hub: any;
+const spawned: { args: string[]; cwd: string }[] = [];
 before(async () => {
   const { Hub } = await import('../src/hub.ts');
   hub = new Hub();
+  // Never launch the real claude CLI from tests.
+  hub.controller.spawnClaude = (args: string[], cwd: string) => {
+    spawned.push({ args, cwd });
+    return { on() {}, pid: undefined, exitCode: null } as any;
+  };
   hub.start();
   await new Promise((r) => setTimeout(r, 300));
 });
@@ -134,6 +140,21 @@ test('instruction for a busy session is queued and delivered on next tool event'
   const r: any = await hook('PostToolUse', { session_id: 's3', cwd: '/x/blog', tool_name: 'Bash', tool_input: {}, tool_response: {} });
   assert.match(r.hookSpecificOutput.additionalContext, /README linklerini/);
   assert.equal(hub.st.queued.has('s3'), false);
+});
+
+test('instruction for an idle session nobody can type into runs in a headless fork', async () => {
+  // Stopped, hold gone (expired / hub restarted), not in tmux: queuing would wait for the keyboard.
+  const s = hub.st.upsertSession('s4', '/x/site', { state: 'waiting' });
+  assert.equal(await hub.controller.instruct(s, 'Vercel deploy et'), 'fork');
+  const forkId = hub.controller.forks.get('s4');
+  const { args, cwd } = spawned.at(-1)!;
+  assert.equal(cwd, '/x/site');
+  assert.deepEqual(args.slice(0, 6), ['-p', '--resume', 's4', '--fork-session', '--session-id', forkId]);
+  assert.match(args.at(-1)!, /Vercel deploy et/);
+  assert.equal(hub.st.queued.has('s4'), false);
+  // The fork is the session the project name now resolves to, and it is running.
+  assert.equal(hub.st.findSession('site').id, forkId);
+  assert.equal(hub.st.sessions.get(forkId).state, 'running');
 });
 
 test('desk mode never holds', async () => {
