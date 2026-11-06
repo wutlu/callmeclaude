@@ -84,7 +84,7 @@ export class VoiceCall {
       model: v.model,
       config: {
         responseModalities: [Modality.AUDIO],
-        systemInstruction: systemPrompt(this.hub),
+        systemInstruction: systemPrompt(this.hub, undefined, this.sink.kind === 'desktop' ? 'desktop' : 'phone'),
         tools: [{ functionDeclarations: declarations }],
         speechConfig: { languageCode: this.hub.cfg.language, voiceConfig: { prebuiltVoiceConfig: { voiceName: v.voiceName } } },
         inputAudioTranscription: {},
@@ -119,7 +119,14 @@ export class VoiceCall {
   attach(sink: CallSink) {
     clearTimeout(this.detachTimer);
     this.detachTimer = undefined;
+    const moved = (sink.kind ?? 'phone') !== (this.sink.kind ?? 'phone');
     this.sink = sink;
+    if (moved)
+      this.send(
+        sink.kind === 'desktop'
+          ? '[SYSTEM] The call moved to the computer: the developer now talks through the computer and can see the screen. Carry on, no need to mention it.'
+          : '[SYSTEM] The call moved to the phone: the developer may be away from the screen now. Carry on, no need to mention it.',
+      );
     this.lastAudioAt = Date.now();
     this.stats.reattached++;
     log.info('call re-attached', this.callId);

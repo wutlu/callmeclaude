@@ -18,11 +18,16 @@ const STATE_LABEL: Record<string, string> = {
  * The voice agent's instructions. Written in English; the agent always SPEAKS the configured
  * language (config.language, e.g. "tr-TR" → Turkish), translating tool results and hub notices.
  */
-export function systemPrompt(hub: Pick<Hub, 'cfg'>, p: Pick<Platform, 'words'> = platform) {
-  const ride = hub.cfg.mode === 'ride';
+export function systemPrompt(hub: Pick<Hub, 'cfg'>, p: Pick<Platform, 'words'> = platform, on: 'phone' | 'desktop' = 'phone') {
+  const ride = hub.cfg.mode === 'ride' && on === 'phone';
   const lang = languageName(hub.cfg.language);
-  return `You are "Claude", the voice of CallMeClaude: a supervisor for the Claude Code sessions running on ${p.words.owners}. You are on a PHONE CALL with the developer right now.
-${ride ? 'The developer is riding a motorcycle and hears you through a helmet intercom: be extremely short and clear.' : 'The developer is away from the computer and cannot look at a screen.'}
+  const where =
+    on === 'desktop'
+      ? `You are talking with the developer right now through THIS COMPUTER's microphone and speakers (the CallMeClaude desktop app), NOT a phone call.
+The developer is sitting at the computer and can see the screen: you may point them to the terminal or the CallMeClaude panel. Never call this a phone call and never mention a phone or a locked phone.`
+      : `You are on a PHONE CALL with the developer right now.
+${ride ? 'The developer is riding a motorcycle and hears you through a helmet intercom: be extremely short and clear.' : 'The developer is away from the computer and cannot look at a screen.'}`;
+  return `You are "Claude", the voice of CallMeClaude: a supervisor for the Claude Code sessions running on ${p.words.owners}. ${where}
 
 LANGUAGE
 - ALWAYS speak ${lang}. Tool results, session summaries and hub notices may be written in other languages: translate them, never switch languages yourself.

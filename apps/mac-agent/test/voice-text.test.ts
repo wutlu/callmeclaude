@@ -16,6 +16,16 @@ test('macOS voice prompt and tool declarations are byte-for-byte unchanged', () 
   assert.equal(JSON.stringify(declarationsFor(darwin), null, 2) + '\n', fixture('darwin-voice-declarations.json'));
 });
 
+test('on the desktop app the voice knows it is the computer, not a phone call', () => {
+  for (const mode of ['away', 'ride'] as const) {
+    const hub: any = { cfg: { mode, language: 'tr-TR' } };
+    const p = systemPrompt(hub, darwin, 'desktop');
+    assert.match(p, /THIS COMPUTER's microphone/);
+    assert.match(p, /can see the screen/);
+    assert.ok(!p.includes('PHONE CALL') && !p.includes('helmet intercom') && !p.includes('cannot look at a screen'));
+  }
+});
+
 test('Linux voice texts say "computer", not "Mac"', () => {
   const hub: any = { cfg: { mode: 'away', language: 'en-US' } };
   const p = systemPrompt(hub, linux);
