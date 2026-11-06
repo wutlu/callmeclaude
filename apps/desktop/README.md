@@ -17,6 +17,33 @@ A tray app for macOS and Linux. It connects to the hub on the same computer the 
 
 The hub must be set up first (`cmc setup`, see the main README). The Windows build is a client only: the hub does not run on Windows yet.
 
+## Install
+
+Download the file for your computer from the [latest desktop release](https://github.com/wutlu/callmeclaude/releases?q=desktop-v&expanded=true):
+
+| Computer | File |
+|---|---|
+| Mac with Apple silicon (M1 or later) | `CallMeClaude-<version>-mac-arm64.dmg` |
+| Mac with an Intel processor | `CallMeClaude-<version>-mac-x64.dmg` |
+| Linux, any distribution | `CallMeClaude-<version>-linux-x86_64.AppImage` |
+| Debian, Ubuntu, Mint | `CallMeClaude-<version>-linux-amd64.deb` |
+
+**macOS: the first open shows a warning.** The app is not signed with an Apple Developer ID and not notarized, so macOS says it can't check the app for malware (or, on some Macs, that the app "is damaged"). The app is fine. To open it once:
+
+1. Open the dmg and drag **CallMeClaude** to **Applications**.
+2. Open CallMeClaude. When the warning appears, click **Done** (not **Move to Trash**).
+3. Open **System Settings → Privacy & Security**, scroll down to the message about CallMeClaude, click **Open Anyway**, and confirm with your password.
+
+On macOS 14 and earlier, right-clicking the app and choosing **Open** works too. If macOS says the app "is damaged", or there is no **Open Anyway** button, run this once in Terminal, then open the app normally:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/CallMeClaude.app
+```
+
+After the first open, macOS no longer asks. On the first call it asks for microphone access; allow it so you can talk on this computer.
+
+**Linux:** make the AppImage executable (`chmod +x CallMeClaude-*.AppImage`) and run it, or install the deb with `sudo apt install ./CallMeClaude-*.deb`.
+
 ## Develop
 
 ```bash
@@ -34,7 +61,7 @@ pnpm --filter @callmeclaude/desktop dist        # this OS: dmg (macOS), AppImage
 
 Builds land in `apps/desktop/release/`.
 
-- The macOS build is ad-hoc signed and not notarized. The first time, open it with right-click → **Open**. A Developer ID is used automatically when `CSC_LINK`/`CSC_KEY_PASSWORD` are set.
+- The macOS build is ad-hoc signed and not notarized; see [Install](#install) for the first open. A Developer ID is used automatically when `CSC_LINK`/`CSC_KEY_PASSWORD` are set.
 - The GitHub workflow `desktop-release` builds all three platforms. It runs on a `desktop-v*` tag, or by hand.
 
 ## Layout

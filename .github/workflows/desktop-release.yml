@@ -54,5 +54,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd apps/desktop/release
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "CallMeClaude desktop ${GITHUB_REF_NAME#desktop-v}" --notes "Tray app for macOS and Linux. The Windows build is a client only: the hub does not run on Windows yet." || true
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "CallMeClaude desktop ${GITHUB_REF_NAME#desktop-v}" --notes "Tray app for macOS and Linux. The Windows build is a client only: the hub does not run on Windows yet. macOS shows a warning the first time you open the app because it is not notarized; see https://github.com/wutlu/callmeclaude/blob/main/apps/desktop/README.md#install for how to open it." || true
           gh release upload "$GITHUB_REF_NAME" $(ls *.dmg *.AppImage *.deb *.exe 2>/dev/null) --clobber

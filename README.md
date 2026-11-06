@@ -76,7 +76,7 @@ Everything else is bring-your-own-key and talks directly to the vendor: a **Gemi
 |---|---|
 | Hub (the computer that stays at home) | **macOS** 15+ · **Linux**: Ubuntu 22.04+, Debian 12+, Fedora, Linux Mint 21+, Arch; X11 and Wayland; GNOME, KDE and wlroots-based desktops (Sway, Hyprland) |
 | Phone | **iPhone** (iOS 17+, [apps/ios](apps/ios/README.md)) · **Android** 10+ ([apps/android](apps/android/README.md)) |
-| Desktop tray app | **macOS** (dmg) · **Linux** (AppImage, deb) ([apps/desktop](apps/desktop/README.md)). A Windows installer is built too, but the hub does not run on Windows yet |
+| Desktop tray app | **macOS** (dmg) · **Linux** (AppImage, deb) ([apps/desktop](apps/desktop/README.md); macOS warns on the first open, see [how to open it](apps/desktop/README.md#install)). A Windows installer is built too, but the hub does not run on Windows yet |
 
 Any phone works with any hub: the Android app also works with a macOS hub, and the iPhone app with a Linux hub.
 
