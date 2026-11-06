@@ -69,7 +69,7 @@ export function briefing(hub: Hub, agenda: CallItem[] = []) {
   lines.push(`Mode: ${hub.cfg.mode}${hub.st.paused ? ' (PAUSED: no automatic actions)' : ''}. Open sessions: ${ss.length}. Pending decisions: ${pend.length}.`);
   for (const s of ss.slice(0, 12)) {
     const ago = Math.round((Date.now() - Date.parse(s.updatedAt)) / 60000);
-    lines.push(`- ${s.project}: ${STATE_LABEL[s.state] ?? s.state} (${ago} min ago): ${s.summary}`);
+    lines.push(`- ${s.project}${s.background ? ' (background copy, no window)' : ''}: ${STATE_LABEL[s.state] ?? s.state} (${ago} min ago): ${s.summary}`);
   }
   if (pend.length) {
     lines.push('Pending decisions:');

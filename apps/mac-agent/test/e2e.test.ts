@@ -4,6 +4,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
+import { EventEmitter } from 'node:events';
 
 // Isolated hub home + ports so tests never touch the real installation.
 const home = mkdtempSync(join(process.env.CMC_TEST_TMP ?? tmpdir(), 'cmc-test-'));
@@ -19,14 +20,15 @@ writeFileSync(
 if (!process.env.CMC_TEST_LIVE) process.env.CMC_CLASSIFY_OFFLINE = '1';
 
 let hub: any;
-const spawned: { args: string[]; cwd: string }[] = [];
+const spawned: { args: string[]; cwd: string; child: EventEmitter }[] = [];
 before(async () => {
   const { Hub } = await import('../src/hub.ts');
   hub = new Hub();
   // Never launch the real claude CLI from tests.
   hub.controller.spawnClaude = (args: string[], cwd: string) => {
-    spawned.push({ args, cwd });
-    return { on() {}, pid: undefined, exitCode: null } as any;
+    const child: any = Object.assign(new EventEmitter(), { pid: undefined, exitCode: null });
+    spawned.push({ args, cwd, child });
+    return child;
   };
   hub.start();
   await new Promise((r) => setTimeout(r, 300));
@@ -159,6 +161,12 @@ test('instruction for an idle session nobody can type into runs in a headless fo
   // The fork is the session the project name now resolves to, and it is running.
   assert.equal(hub.st.findSession('site').id, forkId);
   assert.equal(hub.st.sessions.get(forkId).state, 'running');
+  // The apps label it as a background copy while it runs (cards and the pending it raises).
+  const card = hub.st.snapshot().sessions.find((c: any) => c.id === forkId);
+  assert.equal(card.background, true);
+  assert.equal(hub.st.snapshot().sessions.find((c: any) => c.id === 's4')?.background, undefined);
+  spawned.at(-1)!.child.emit('exit', 0);
+  assert.equal(hub.st.sessions.get(forkId).background, false);
 });
 
 test('cmc tell: the control API delivers an instruction to a session by project name', async () => {

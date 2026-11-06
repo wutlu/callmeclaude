@@ -94,9 +94,9 @@ export class Controller {
     }
     if (s.state !== 'running') {
       const forkId = randomUUID();
-      this.spawnClaude(forkArgs(s.id, forkId, text), s.cwd);
       this.forks.set(s.id, forkId);
       this.st.upsertSession(forkId, s.cwd, { state: 'running', summary: 'Instruction delivered, working.', lastPrompt: s.lastPrompt });
+      this.runBackground(forkId, forkArgs(s.id, forkId, text), s.cwd);
       // The project name now means the fork; the idle window comes back on its next hook if the developer types there.
       this.mark(s, 'ended', 'Continued in a background copy (phone instruction).');
       audit('session.fork', { session: s.id, fork: forkId, text });
@@ -223,9 +223,8 @@ export class Controller {
       throw new Error(`Not starting a session in ${dir}: it is outside the configured project roots.`);
     }
     const id = randomUUID();
-    const child = this.spawnClaude(headlessStartArgs(id, task), dir);
-    child.on('exit', () => this.headless.delete(id));
-    this.headless.set(id, child);
+    this.st.upsertSession(id, dir, { state: 'running', summary: 'Session started, working.' });
+    const child = this.runBackground(id, headlessStartArgs(id, task), dir);
     audit('session.start', { dir, task, headless: id, pid: child.pid });
     return id;
   }
@@ -243,8 +242,29 @@ export class Controller {
     return true;
   }
 
+  /**
+   * Run a headless `claude -p` for a session and mark it as background while it runs, so the apps can tell
+   * it apart from a window with the same project name. Tracked so stop() can end it.
+   */
+  private runBackground(id: string, args: string[], cwd: string): ChildProcess {
+    const child = this.spawnClaude(args, cwd);
+    this.headless.set(id, child);
+    const s = this.st.sessions.get(id);
+    if (s) s.background = true;
+    this.st.changed();
+    child.on('exit', () => {
+      if (this.headless.get(id) === child) this.headless.delete(id);
+      const cur = this.st.sessions.get(id);
+      if (cur?.background) {
+        cur.background = false;
+        this.st.changed();
+      }
+    });
+    return child;
+  }
+
   private resumeHeadless(s: Session, text: string) {
-    this.spawnClaude(['-p', '--resume', s.id, '--permission-mode', 'acceptEdits', PREFIX + text], s.cwd);
+    this.runBackground(s.id, ['-p', '--resume', s.id, '--permission-mode', 'acceptEdits', PREFIX + text], s.cwd);
     audit('session.resume', { session: s.id, text });
   }
 

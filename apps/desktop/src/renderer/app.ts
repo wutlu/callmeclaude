@@ -294,9 +294,12 @@ cmc setup --gemini-key &lt;KEY&gt;</pre>
     <p>Start it in a terminal with <code>cmc restart</code>. This window reconnects by itself.</p></section>`;
 }
 
+/** Marks a session running without a window (a background copy the hub started), so two same-named cards are told apart. */
+const BG = ' <span class="bg" title="Runs in the background with no window: a copy CallMeClaude started for a phone or panel instruction.">Background</span>';
+
 function pendingCard(p: PendingCard): string {
   const head = `<section class="card pending risk-${p.risk}">
-    <div class="row between"><h3>${esc(p.project)}</h3><span class="tag">${p.kind === 'permission' ? 'Permission' : 'Waiting'}</span></div>
+    <div class="row between"><h3>${esc(p.project)}${p.background ? BG : ''}</h3><span class="tag">${p.kind === 'permission' ? 'Permission' : 'Waiting'}</span></div>
     <p>${esc(p.summary)}</p>`;
   // A waiting session asked something or finished: it needs words, not a yes (a bare "Approved, go ahead." answers nothing).
   if (p.kind !== 'permission') {
@@ -317,7 +320,7 @@ function pendingCard(p: PendingCard): string {
 
 function sessionRow(s: SessionCard): string {
   return `<li class="session"><span class="dot st-${s.state}"></span>
-    <div class="grow"><div class="row between"><b>${esc(s.project)}</b><span class="st st-${s.state}">${stateLabel(s.state)}</span></div>
+    <div class="grow"><div class="row between"><b>${esc(s.project)}${s.background ? BG : ''}</b><span class="st st-${s.state}">${stateLabel(s.state)}</span></div>
     <p class="muted clip">${esc(s.summary)}</p><span class="time">${relative(s.updatedAt)}</span></div></li>`;
 }
 

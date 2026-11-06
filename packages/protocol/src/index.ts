@@ -43,6 +43,8 @@ export interface SessionCard {
   summary: string;
   updatedAt: string;
   controllable: Array<'hold' | 'tmux' | 'resume' | 'queue'>;
+  /** Runs headless with no window (a background copy or a resumed session): nobody can type into it. */
+  background?: boolean;
 }
 
 export interface PendingCard {
@@ -54,6 +56,8 @@ export interface PendingCard {
   risk: Risk;
   createdAt: string;
   deadline: string;
+  /** Asked by a session running in the background (see SessionCard.background). */
+  background?: boolean;
 }
 
 export interface Snapshot {

@@ -21,6 +21,8 @@ export interface Session {
   updatedAt: string;
   lastToolAt?: string;
   openTool?: string;
+  /** Running as a headless `claude -p` the hub started (fork, resume or voice start): there is no window. */
+  background?: boolean;
 }
 
 export interface Pending {
@@ -242,6 +244,7 @@ export class State extends EventEmitter {
           risk: p.risk,
           createdAt: p.createdAt,
           deadline: p.deadline,
+          ...(this.sessions.get(p.sessionId)?.background ? { background: true } : {}),
         }),
       ),
     };
@@ -255,7 +258,16 @@ const toCard =
     if (st.holdForSession(s.id)) c.push('hold');
     if (s.tmuxPane) c.push('tmux');
     c.push('queue');
-    return { id: s.id, project: s.project, cwd: s.cwd, state: s.state, summary: s.summary, updatedAt: s.updatedAt, controllable: c };
+    return {
+      id: s.id,
+      project: s.project,
+      cwd: s.cwd,
+      state: s.state,
+      summary: s.summary,
+      updatedAt: s.updatedAt,
+      controllable: c,
+      ...(s.background ? { background: true } : {}),
+    };
   };
 
 export function norm(s: string) {

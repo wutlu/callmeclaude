@@ -179,7 +179,7 @@ function buildMenu(): Menu {
     });
     for (const p of s!.pending.slice(0, 8)) {
       items.push({
-        label: `⚠︎ ${p.project}: ${clipText(p.summary, 50)}`,
+        label: `⚠︎ ${p.project}${p.background ? ' (background)' : ''}: ${clipText(p.summary, 50)}`,
         submenu: [
           { label: clipText(p.summary, 120), enabled: false },
           { type: 'separator' },
@@ -197,7 +197,7 @@ function buildMenu(): Menu {
     items.push({
       label: `Sessions (${s!.sessions.length})`,
       enabled: s!.sessions.length > 0,
-      submenu: s!.sessions.slice(0, 20).map((x) => ({ label: `${x.project} — ${stateLabel(x.state)}`, sublabel: clipText(x.summary, 80), enabled: false })),
+      submenu: s!.sessions.slice(0, 20).map((x) => ({ label: `${x.project}${x.background ? ' (background)' : ''} — ${stateLabel(x.state)}`, sublabel: clipText(x.summary, 80), enabled: false })),
     });
     items.push(s!.paused ? { label: 'Resume automation', click: () => command({ type: 'resume' }) } : { label: 'Stop everything…', click: () => showWindow() });
     items.push({ type: 'separator' });
