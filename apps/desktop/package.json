@@ -73,6 +73,7 @@
           ]
         }
       ],
+      "executableName": "callmeclaude",
       "category": "Development",
       "icon": "build/icon.png",
       "synopsis": "Claude Code sessions in your tray; talk to Claude by voice.",
