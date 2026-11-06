@@ -263,13 +263,13 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
     /// Spoken locally when the Mac can't be reached, in the configured voice language.
     static func unreachableText(_ lang: String) -> String {
         switch String(lang.prefix(2)) {
-        case "tr": return "Mac'ine şu an ulaşılamıyor. Daha sonra tekrar dene."
-        case "de": return "Dein Mac ist gerade nicht erreichbar. Versuch es später noch einmal."
-        case "fr": return "Ton Mac est injoignable pour le moment. Réessaie plus tard."
-        case "es": return "No se puede contactar con tu Mac ahora mismo. Inténtalo más tarde."
-        case "it": return "Il tuo Mac non è raggiungibile in questo momento. Riprova più tardi."
-        case "pt": return "Não foi possível contactar o teu Mac agora. Tenta novamente mais tarde."
-        default: return "Your Mac can't be reached right now. Please try again later."
+        case "tr": return "Mac'ine ulaşılamıyor. Uygulamayı açıp tekrar eşleştirmeyi dene."
+        case "de": return "Dein Mac ist nicht erreichbar. Öffne die App und kopple ihn erneut."
+        case "fr": return "Ton Mac est injoignable. Ouvre l'app et refais le jumelage."
+        case "es": return "No se puede contactar con tu Mac. Abre la app y vuelve a emparejarlo."
+        case "it": return "Il tuo Mac non è raggiungibile. Apri l'app e prova ad abbinarlo di nuovo."
+        case "pt": return "Não foi possível contactar o teu Mac. Abre a app e emparelha-o de novo."
+        default: return "Your Mac can't be reached. Open the app and try pairing again."
         }
     }
 

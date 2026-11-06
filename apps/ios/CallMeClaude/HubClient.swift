@@ -12,6 +12,8 @@ final class HubClient: NSObject, ObservableObject {
     @Published private(set) var snapshot: Snapshot?
     @Published private(set) var lastSeen: Date?
     @Published private(set) var status = "Not connected"
+    /// No saved address answered: the Mac probably moved to another network; the home screen offers re-pairing.
+    @Published private(set) var unreachable = false
     @Published var pairing: PairingInfo? = PairingStore.load()
 
     // Callbacks (may be invoked off the main thread)
@@ -123,7 +125,8 @@ final class HubClient: NSObject, ObservableObject {
             self.candidates = []
             self.task?.cancel(with: .goingAway, reason: nil)
             self.task = nil
-            self.setStatus("Can't reach your Mac. Is Tailscale on, or are you on its Wi‑Fi?")
+            self.setStatus("Can't reach your Mac")
+            DispatchQueue.main.async { self.unreachable = true }
             self.flushWaiters(false)
             self.scheduleReconnect(after: 3)
         }
@@ -224,7 +227,7 @@ final class HubClient: NSObject, ObservableObject {
 
     func setPairing(_ p: PairingInfo?) {
         PairingStore.save(p)
-        DispatchQueue.main.async { self.pairing = p }
+        DispatchQueue.main.async { self.pairing = p; self.unreachable = false }
         q.async {
             self.generation += 1
             self.task?.cancel(with: .normalClosure, reason: nil)
@@ -296,6 +299,7 @@ final class HubClient: NSObject, ObservableObject {
             }
             if type == "hello" {
                 let urls = (obj["urls"] as? [Any])?.compactMap { $0 as? String }
+                DispatchQueue.main.async { self.unreachable = false }
                 q.async {
                     if let urls { self.updateUrls(urls) }
                     self.setConnected(true)

@@ -411,13 +411,13 @@ class CallManager(
 
         /** Spoken locally when the computer can't be reached (iOS CallManager.unreachableText, "Mac" → "computer"). */
         fun unreachableText(lang: String): String = when (lang.take(2)) {
-            "tr" -> "Bilgisayarına şu an ulaşılamıyor. Daha sonra tekrar dene."
-            "de" -> "Dein Computer ist gerade nicht erreichbar. Versuch es später noch einmal."
-            "fr" -> "Ton ordinateur est injoignable pour le moment. Réessaie plus tard."
-            "es" -> "No se puede contactar con tu ordenador ahora mismo. Inténtalo más tarde."
-            "it" -> "Il tuo computer non è raggiungibile in questo momento. Riprova più tardi."
-            "pt" -> "Não foi possível contactar o teu computador agora. Tenta novamente mais tarde."
-            else -> "Your computer can't be reached right now. Please try again later."
+            "tr" -> "Bilgisayarına ulaşılamıyor. Uygulamayı açıp tekrar eşleştirmeyi dene."
+            "de" -> "Dein Computer ist nicht erreichbar. Öffne die App und kopple ihn erneut."
+            "fr" -> "Ton ordinateur est injoignable. Ouvre l'app et refais le jumelage."
+            "es" -> "No se puede contactar con tu ordenador. Abre la app y vuelve a emparejarlo."
+            "it" -> "Il tuo computer non è raggiungibile. Apri l'app e prova ad abbinarlo di nuovo."
+            "pt" -> "Não foi possível contactar o teu computador. Abre a app e emparelha-o de novo."
+            else -> "Your computer can't be reached. Open the app and try pairing again."
         }
     }
 }

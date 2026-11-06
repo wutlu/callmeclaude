@@ -59,12 +59,14 @@ struct HomeView: View {
     @EnvironmentObject var calls: CallManager
     @State private var showSettings = false
     @State private var confirmPanic = false
+    @State private var showRepair = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 18) {
                     ConnectionPill()
+                    if hub.unreachable && !hub.connected { RepairCard { showRepair = true } }
                     CallHero()
                     ModePicker()
                     if hub.snapshot?.paused == true { PausedBanner() }
@@ -102,11 +104,30 @@ struct HomeView: View {
             }
             .refreshable { hub.ensureConnected() }
             .sheet(isPresented: $showSettings) { SettingsView() }
+            .sheet(isPresented: $showRepair) { PairingView() }
             .confirmationDialog("Interrupt all sessions and pause automation?", isPresented: $confirmPanic, titleVisibility: .visible) {
                 Button("Stop everything", role: .destructive) { hub.panic() }
             }
         }
         .onAppear { hub.ensureConnected() }
+    }
+}
+
+/// Shown when no saved address answers (typically the Mac moved to another network): point to re-pairing.
+struct RepairCard: View {
+    var onPair: () -> Void
+    var body: some View {
+        Card {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Can't reach your Mac", systemImage: "wifi.exclamationmark").font(.headline)
+                Text("Please try pairing again: run **cmc pair** on your Mac and scan the new code. Your sessions and settings stay as they are.")
+                    .font(.callout).foregroundStyle(.secondary)
+                Button(action: onPair) {
+                    Label("Pair again", systemImage: "qrcode.viewfinder").frame(maxWidth: .infinity, minHeight: 40)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
     }
 }
 
@@ -402,6 +423,7 @@ struct CallKey: View {
 
 struct PairingView: View {
     @EnvironmentObject var hub: HubClient
+    @Environment(\.dismiss) private var dismiss
     @State private var manual = ""
     @State private var error: String?
     @State private var scanning = true
@@ -446,6 +468,7 @@ struct PairingView: View {
         }
         scanning = false
         hub.setPairing(p)
+        dismiss()  // re-pairing sheet; a no-op on the first-run screen
     }
 }
 

@@ -45,6 +45,7 @@ class HubClient(
     private val _status = MutableStateFlow("Not connected")
     private val _pairing = MutableStateFlow(store.load())
     private val _pairingInvalid = MutableStateFlow(false)
+    private val _unreachable = MutableStateFlow(false)
 
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
     val snapshot: StateFlow<Snapshot?> = _snapshot.asStateFlow()
@@ -54,6 +55,9 @@ class HubClient(
 
     /** The hub refused the stored token (close code 4003). Cleared by [setPairing]. */
     val pairingInvalid: StateFlow<Boolean> = _pairingInvalid.asStateFlow()
+
+    /** No saved address answered the last attempt; the home screen suggests pairing again. Cleared by hello / [setPairing]. */
+    val unreachable: StateFlow<Boolean> = _unreachable.asStateFlow()
 
     /** Binary frames (assistant audio). Called on OkHttp's reader thread. */
     @Volatile var onBinary: ((ByteString) -> Unit)? = null
@@ -210,7 +214,8 @@ class HubClient(
             candidates.clear()
             task?.cancel()
             task = null
-            _status.value = "Can't reach your computer. Is Tailscale on, or are you on its Wi‑Fi?"
+            _status.value = "Can't reach your computer"
+            _unreachable.value = true
             apply("attempt timed out", policy.attemptTimedOut())
         }
     }
@@ -350,6 +355,7 @@ class HubClient(
         store.save(p)
         _pairing.value = p
         _pairingInvalid.value = false
+        _unreachable.value = false
         policy.paired()
         remote.setSecrets(RemoteLog.secretsOf(p, deviceName))
         if (p == null) _snapshot.value = null
@@ -374,6 +380,7 @@ class HubClient(
         when (msg) {
             is HubMessage.Hello -> {
                 msg.snapshot?.let { _snapshot.value = it }
+                _unreachable.value = false
                 updateUrls(msg.urls)
                 setConnected(true)
                 apply("hello", policy.connected())

@@ -63,4 +63,13 @@ class WarningsTest {
         val h2 = allBad.copy(batteryCardDismissed = true, connected = true)
         assertEquals(listOf(Warning.NOTIFICATIONS, Warning.FULL_SCREEN_INTENT), homeWarnings(h2))
     }
+
+    @Test
+    fun `unreachable computer suggests pairing again`() {
+        assertEquals(listOf(Warning.UNREACHABLE), warnings(Health(unreachable = true)))
+        // Connected again (e.g. over Tailscale) or missing permission: the more precise answer wins.
+        assertEquals(emptyList<Warning>(), warnings(Health(unreachable = true, connected = true)))
+        assertEquals(listOf(Warning.LOCAL_NETWORK), warnings(Health(unreachable = true, localNetwork = LocalNetworkAccess.DENIED)))
+        assertEquals(listOf(Warning.PAIRING_INVALID), warnings(Health(unreachable = true, pairingInvalid = true)))
+    }
 }

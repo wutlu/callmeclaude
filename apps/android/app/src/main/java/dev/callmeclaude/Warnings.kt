@@ -11,6 +11,9 @@ enum class Warning {
     /** Android 17+: no local network permission and not connected. */
     LOCAL_NETWORK,
 
+    /** No saved address answered (typically the computer moved to another network): pair again. */
+    UNREACHABLE,
+
     /** Notifications are off: no ringing UI, no status notification. */
     NOTIFICATIONS,
 
@@ -24,6 +27,8 @@ enum class Warning {
 data class Health(
     val pairingInvalid: Boolean = false,
     val connected: Boolean = false,
+    /** The last connection attempt timed out on every saved address. */
+    val unreachable: Boolean = false,
     val localNetwork: LocalNetworkAccess = LocalNetworkAccess.NOT_REQUIRED,
     val notificationsEnabled: Boolean = true,
     val fullScreenIntentAllowed: Boolean = true,
@@ -39,6 +44,8 @@ fun warnings(h: Health): List<Warning> {
         // A live connection proves the LAN is reachable (or the hub is reached another way).
         if (!h.connected && (h.localNetwork == LocalNetworkAccess.DENIED || h.localNetwork == LocalNetworkAccess.BLOCKED)) {
             add(Warning.LOCAL_NETWORK)
+        } else if (!h.connected && h.unreachable) {
+            add(Warning.UNREACHABLE)
         }
         if (!h.notificationsEnabled) add(Warning.NOTIFICATIONS)
         if (!h.fullScreenIntentAllowed) add(Warning.FULL_SCREEN_INTENT)

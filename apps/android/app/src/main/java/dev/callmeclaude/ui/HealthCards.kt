@@ -46,6 +46,7 @@ fun rememberHealth(hub: HubClient, localNetwork: LocalNetworkState): HealthState
     val context = LocalContext.current
     val connected by hub.connected.collectAsStateWithLifecycle()
     val invalid by hub.pairingInvalid.collectAsStateWithLifecycle()
+    val unreachable by hub.unreachable.collectAsStateWithLifecycle()
     var resumes by remember { mutableIntStateOf(0) }
     LifecycleResumeEffect(Unit) {
         resumes++
@@ -58,6 +59,7 @@ fun rememberHealth(hub: HubClient, localNetwork: LocalNetworkState): HealthState
         health = Health(
             pairingInvalid = invalid,
             connected = connected,
+            unreachable = unreachable,
             localNetwork = localNetwork.access,
             notificationsEnabled = platform.notifications,
             fullScreenIntentAllowed = platform.fullScreenIntent,
@@ -154,6 +156,12 @@ fun WarningCard(
                 OutlinedButton(onClick = { openAppSettings(context) }) { Text("Open settings") }
             }
         }
+
+        Warning.UNREACHABLE -> WarningBox(
+            "Can't reach your computer",
+            "Please try pairing again: run cmc pair on the computer and scan the new code. " +
+                "Your sessions and settings stay as they are.",
+        ) { Button(onClick = onPairAgain) { Text("Pair again") } }
 
         Warning.NOTIFICATIONS -> WarningBox(
             "Notifications are off",
