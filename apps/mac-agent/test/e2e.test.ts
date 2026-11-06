@@ -371,3 +371,16 @@ test('on a call, a second decision waits until the first is answered', async () 
   hub.st.pending.delete('p_q1');
   hub.st.pending.delete('p_q2');
 });
+
+test('background sessions are found from running claude -p processes (also ones started before a restart)', async () => {
+  const { headlessIds } = await import('../src/controller.ts');
+  const ps = [
+    'COMMAND',
+    'claude -p --resume aaa --fork-session --session-id bbb-1 --permission-mode acceptEdits The developer said',
+    '/usr/local/bin/claude -p --resume ccc --permission-mode acceptEdits hi',
+    'claude --allow-dangerously-skip-permissions --chrome',
+    'claude --resume ddd',
+    'grep claude -p --session-id zzz',
+  ].join('\n');
+  assert.deepEqual([...headlessIds(ps)].sort(), ['bbb-1', 'ccc']);
+});

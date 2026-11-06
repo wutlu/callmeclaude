@@ -15,6 +15,28 @@ export function headlessStartArgs(sessionId: string, task: string): string[] {
   return ['-p', '--session-id', sessionId, '--permission-mode', 'acceptEdits', task];
 }
 
+/**
+ * Session ids that a running headless `claude -p` works on, from `ps -axo command` output:
+ * its --session-id (new session or fork), else its --resume id.
+ */
+export function headlessIds(psOutput: string): Set<string> {
+  const ids = new Set<string>();
+  for (const line of psOutput.split('\n')) {
+    const words = line.trim().split(/\s+/);
+    // The program itself must be claude (not a shell or grep whose arguments mention it).
+    if (!/(^|\/)claude$/.test(words[0] ?? '')) continue;
+    const args = words.slice(1);
+    if (!args.includes('-p') && !args.includes('--print')) continue;
+    const at = (flag: string) => {
+      const i = args.indexOf(flag);
+      return i >= 0 ? args[i + 1] : undefined;
+    };
+    const id = at('--session-id') ?? at('--resume');
+    if (id && /^[\w-]+$/.test(id)) ids.add(id);
+  }
+  return ids;
+}
+
 /** argv for a headless copy of an idle session: same conversation, new id fixed up front (so a callback can bind to it). */
 export function forkArgs(sessionId: string, forkId: string, text: string): string[] {
   return ['-p', '--resume', sessionId, '--fork-session', '--session-id', forkId, '--permission-mode', 'acceptEdits', PREFIX + text];
@@ -261,6 +283,29 @@ export class Controller {
       }
     });
     return child;
+  }
+
+  /**
+   * Re-check which sessions run headless by looking at the processes themselves: also catches copies started
+   * before the hub restarted (no child handle) and ones that ended while nobody was watching.
+   */
+  async scanBackground() {
+    let out: string;
+    try {
+      out = (await execFileP('ps', ['-axo', 'command'])).stdout;
+    } catch {
+      return;
+    }
+    const live = headlessIds(out);
+    let changed = false;
+    for (const s of this.st.sessions.values()) {
+      const bg = live.has(s.id) || this.headless.has(s.id);
+      if (!!s.background !== bg) {
+        s.background = bg;
+        changed = true;
+      }
+    }
+    if (changed) this.st.changed();
   }
 
   private resumeHeadless(s: Session, text: string) {

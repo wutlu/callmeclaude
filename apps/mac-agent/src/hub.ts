@@ -72,6 +72,8 @@ export class Hub {
     startHookServer(this);
     this.app.start();
     setInterval(() => void this.detectStale(), 60_000);
+    setInterval(() => void this.controller.scanBackground(), 15_000);
+    void this.controller.scanBackground();
     void this.detectStale();
     log.info(`CallMeClaude hub ${HUB_VERSION} started (mode=${this.cfg.mode})`);
     audit('hub.start', { version: HUB_VERSION });
