@@ -174,6 +174,7 @@ The tray icon also picks where Claude calls you when a session needs you:
 This software can operate your computer by voice. The defaults are conservative:
 
 - Risky actions need an explicit spoken confirmation: payments, deploys, `git push`, deleting, sending messages, computer use.
+- **Permission prompts: only critical ones reach you.** By default the hub approves every permission request a session raises (edits, commands, installs, pushes, deploys) except critical ones: payments and card numbers, sign-ups and logins, messages to other people, and deleting data that can't be brought back (`rm -rf ~`, force push, `git reset --hard`, dropping a database, deleting a cloud project). Those ring you. Set `"approvals": "ask"` in `~/.callmeclaude/config.json` to be asked for everything except read-only requests.
 - Destructive shell commands and sensitive paths (`~/.ssh`, the Keychain, `.env`; on Linux also the keyring files) are blocked for the hub's own agent.
 - On Linux the hub's agent types text only by pasting it through the clipboard and puts your clipboard back afterwards; select-all (Ctrl+A) and cut (Ctrl+X) are blocked for it, and it fixes mistakes only with undo (Ctrl+Z).
 - **Locked phone = ask only.** While the phone is on its lock screen (PIN, Face ID or pattern set), anyone holding it can talk to Claude, so the hub only lets them ask: session status and questions work, but instructing sessions, approving permissions, starting sessions and computer use need the phone unlocked first. Denying a permission and the emergency stop always work.

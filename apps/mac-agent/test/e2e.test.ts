@@ -120,7 +120,35 @@ test('session lifecycle + blocked stop is held, phone rings, instruction continu
   hub.calls.takeAgenda();
 });
 
-test('permission request: auto-approve rule, then held + approved', async () => {
+test('full permission by default: edits, commands and pushes go through; a payment rings', async () => {
+  for (const [tool, input] of [
+    ['Edit', { file_path: '/x/api/src/payments.ts', old_string: 'a', new_string: 'b' }],
+    ['Bash', { command: 'npm install && npm test' }],
+    ['Bash', { command: 'git push origin main' }],
+  ] as const) {
+    const r: any = await hook('PermissionRequest', { session_id: 's_full', cwd: '/x/api', tool_name: tool, tool_input: input });
+    assert.equal(r.hookSpecificOutput.decision.behavior, 'allow', tool);
+  }
+  assert.equal(hub.st.openPending().length, 0);
+  const held = hook('PermissionRequest', {
+    session_id: 's_full',
+    cwd: '/x/api',
+    tool_name: 'mcp__claude-in-chrome__form_input',
+    tool_input: { ref: 'card', value: '4242 4242 4242 4242' },
+  });
+  await new Promise((r) => setTimeout(r, 100));
+  const pend = hub.st.openPending()[0];
+  assert.equal(pend.risk, 'critical');
+  assert.match(pend.summary, /card number/);
+  assert.ok(hub.controller.permission(hub.st.sessions.get('s_full'), false));
+  const r: any = await held;
+  assert.equal(r.hookSpecificOutput.decision.behavior, 'deny');
+  hub.calls.takeAgenda();
+});
+
+test('permission request ("ask" mode): auto-approve rule, then held + approved', async () => {
+  hub.cfg.approvals = 'ask';
+  after(() => delete hub.cfg.approvals);
   hub.cfg.autoApprove['api'] = ['Bash(npm test'];
   const auto: any = await hook('PermissionRequest', { session_id: 's2', cwd: '/x/api', tool_name: 'Bash', tool_input: { command: 'npm test -- --watch=false' } });
   assert.equal(auto.hookSpecificOutput.decision.behavior, 'allow');

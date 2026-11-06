@@ -4,6 +4,7 @@ import { basename } from 'node:path';
 import { BRAIN_DIR } from './config.ts';
 import type { Hub } from './hub.ts';
 import { classify, quickClassify } from './classifier.ts';
+import { criticalReason } from './critical.ts';
 import { isReadOnly } from './readOnly.ts';
 import type { Pending, Session } from './state.ts';
 import { audit, clip, log, shortId } from './util.ts';
@@ -230,9 +231,18 @@ async function onPermission(hub: Hub, input: Json, base: Partial<Session>, send:
 
   const rules = cfg.autoApprove[s.project] ?? [];
   const sig = toolSignature(input.tool_name, input.tool_input);
-  const readOnly = cfg.autoApproveReadOnly !== false && isReadOnly(input.tool_name, input.tool_input);
-  if (readOnly || rules.some((r) => sig.startsWith(r))) {
-    audit('permission.auto', { session: s.id, project: s.project, tool: input.tool_name, why: readOnly ? 'read-only' : 'rule', desc });
+  // Default: full permission, the developer is only asked for critical actions (money, accounts, sending, wiping).
+  const critical = criticalReason(input.tool_name, input.tool_input);
+  const why =
+    cfg.approvals !== 'ask' && !critical
+      ? 'not critical'
+      : cfg.autoApproveReadOnly !== false && isReadOnly(input.tool_name, input.tool_input)
+        ? 'read-only'
+        : rules.some((r) => sig.startsWith(r))
+          ? 'rule'
+          : undefined;
+  if (why) {
+    audit('permission.auto', { session: s.id, project: s.project, tool: input.tool_name, why, desc });
     s.state = 'running';
     s.summary = 'Working.';
     st.changed();
@@ -241,7 +251,16 @@ async function onPermission(hub: Hub, input: Json, base: Partial<Session>, send:
   // A session the developer asked to hear back from also rings for permissions, even in desk mode.
   if (st.paused || (hub.deskQuiet() && !st.hasCallback(s))) return send({});
 
-  const p = hold(hub, s, 'permission', `Asks for permission: ${desc}`, JSON.stringify(input.tool_input ?? {}).slice(0, 2000), riskOf(sig), send, res);
+  const p = hold(
+    hub,
+    s,
+    'permission',
+    `Asks for permission: ${desc}${critical ? ` (${critical})` : ''}`,
+    JSON.stringify(input.tool_input ?? {}).slice(0, 2000),
+    critical ? 'critical' : riskOf(sig),
+    send,
+    res,
+  );
   p.toolName = input.tool_name;
   p.toolInput = input.tool_input;
   hub.calls.enqueue({ priority: 'P1', title: `${s.project}: permission`, text: `[${s.project}] Asks for permission: ${desc}`, pendingId: p.id, requested: st.hasCallback(s) });
