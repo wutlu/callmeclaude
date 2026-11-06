@@ -54,7 +54,8 @@ export interface Snapshot {
 }
 
 export type HubToApp =
-  | { type: 'hello'; v: typeof PROTOCOL_VERSION; snapshot: Snapshot }
+  /** urls: the hub's addresses right now; the app replaces its saved ones so a new Wi-Fi doesn't need re-pairing. */
+  | { type: 'hello'; v: typeof PROTOCOL_VERSION; snapshot: Snapshot; urls?: string[] }
   | { type: 'snapshot'; snapshot: Snapshot }
   | { type: 'heartbeat'; ts: string }
   | { type: 'call.incoming'; callId: string; title: string }

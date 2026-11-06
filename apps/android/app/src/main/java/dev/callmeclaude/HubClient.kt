@@ -210,7 +210,7 @@ class HubClient(
             candidates.clear()
             task?.cancel()
             task = null
-            _status.value = "Can't reach your computer"
+            _status.value = "Can't reach your computer. Is Tailscale on, or are you on its Wi‑Fi?"
             apply("attempt timed out", policy.attemptTimedOut())
         }
     }
@@ -335,6 +335,17 @@ class HubClient(
         if (ws.isNotEmpty()) main.post { ws.forEach { it(ok) } }
     }
 
+    /** Hub thread; after a successful auth, so only the paired hub can change the addresses. */
+    private fun updateUrls(fromHub: List<String>?) {
+        val p = _pairing.value ?: return
+        val fresh = mergedUrls(p.urls, fromHub) ?: return
+        val updated = p.copy(urls = fresh)
+        store.save(updated)
+        _pairing.value = updated
+        remote.setSecrets(RemoteLog.secretsOf(updated, deviceName))
+        AppLog.i(TAG, "hub addresses updated: ${fresh.size}")
+    }
+
     fun setPairing(p: PairingInfo?) = post {
         store.save(p)
         _pairing.value = p
@@ -363,6 +374,7 @@ class HubClient(
         when (msg) {
             is HubMessage.Hello -> {
                 msg.snapshot?.let { _snapshot.value = it }
+                updateUrls(msg.urls)
                 setConnected(true)
                 apply("hello", policy.connected())
                 _status.value = "Connected to ${_pairing.value?.name ?: "computer"}"

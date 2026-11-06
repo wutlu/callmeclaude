@@ -123,7 +123,7 @@ final class HubClient: NSObject, ObservableObject {
             self.candidates = []
             self.task?.cancel(with: .goingAway, reason: nil)
             self.task = nil
-            self.setStatus("Can't reach your Mac")
+            self.setStatus("Can't reach your Mac. Is Tailscale on, or are you on its Wi‑Fi?")
             self.flushWaiters(false)
             self.scheduleReconnect(after: 3)
         }
@@ -205,6 +205,23 @@ final class HubClient: NSObject, ObservableObject {
         DispatchQueue.main.async { ws.forEach { $0(ok) } }
     }
 
+    /// The hub's current addresses (from hello): replace the saved ones so a new Wi-Fi or IP needs no re-pairing.
+    /// Only after a successful auth, so only the paired hub can change them. q only.
+    private func updateUrls(_ urls: [String]) {
+        guard var p = pairing, let fresh = HubClient.mergedUrls(saved: p.urls, fromHub: urls) else { return }
+        p.urls = fresh
+        Log.d("hub addresses updated: \(fresh.count)")
+        PairingStore.save(p)
+        DispatchQueue.main.async { self.pairing = p }
+    }
+
+    /// nil = keep the saved list (nothing new, or the hub sent nothing usable).
+    static func mergedUrls(saved: [String], fromHub: [String]) -> [String]? {
+        let valid = fromHub.filter { ($0.hasPrefix("ws://") || $0.hasPrefix("wss://")) && $0.count < 300 }.prefix(12)
+        guard !valid.isEmpty, Array(valid) != saved else { return nil }
+        return Array(valid)
+    }
+
     func setPairing(_ p: PairingInfo?) {
         PairingStore.save(p)
         DispatchQueue.main.async { self.pairing = p }
@@ -278,7 +295,9 @@ final class HubClient: NSObject, ObservableObject {
                 DispatchQueue.main.async { self.snapshot = snap }
             }
             if type == "hello" {
+                let urls = (obj["urls"] as? [Any])?.compactMap { $0 as? String }
                 q.async {
+                    if let urls { self.updateUrls(urls) }
                     self.setConnected(true)
                     self.setStatus("Connected to \(self.pairing?.name ?? "Mac")")
                     self.flushWaiters(true)

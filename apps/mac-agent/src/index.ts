@@ -1,5 +1,5 @@
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { homedir, hostname, networkInterfaces } from 'node:os';
+import { chmodSync, existsSync, readFileSync, readdirSync } from 'node:fs';
+import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
@@ -15,6 +15,7 @@ import { platform, SecretStoreError } from './platform/index.ts';
 import type { DoctorResult } from './platform/types.ts';
 import { onPath } from './platform/linux.ts';
 import { execFileP } from './util.ts';
+import { hubUrls, lanIps, mdnsName, tailscaleInfo } from './addresses.ts';
 import { apnsConfigured, apnsTexts } from './apns.ts';
 import { doctorLine, geminiKeySavedText, helpText, pairTexts, projectRootsResult, voipTokenTexts } from './cliTexts.ts';
 
@@ -99,25 +100,6 @@ async function askVoiceSessions(tmuxInstalled: boolean): Promise<VoiceSessions> 
   }
 }
 
-async function tailscaleInfo(): Promise<{ ip?: string; dns?: string }> {
-  for (const bin of platform.tailscaleBins) {
-    try {
-      const { stdout } = await execFileP(bin, ['status', '--json'], { timeout: 4000 });
-      const j = JSON.parse(stdout);
-      return { ip: j.Self?.TailscaleIPs?.find((x: string) => x.includes('.')), dns: String(j.Self?.DNSName ?? '').replace(/\.$/, '') || undefined };
-    } catch {}
-  }
-  return {};
-}
-
-function lanIps() {
-  const out: string[] = [];
-  for (const [name, addrs] of Object.entries(networkInterfaces())) {
-    for (const a of addrs ?? []) if (a.family === 'IPv4' && !a.internal && platform.isLanInterface(name) && !a.address.startsWith('100.')) out.push(a.address);
-  }
-  return out;
-}
-
 async function main() {
   switch (cmd) {
     case 'serve': {
@@ -179,17 +161,14 @@ async function main() {
         await restartAndWait().catch(() => {});
       }
       const ts = await tailscaleInfo();
-      const urls = [
-        // IP first: no DNS lookup needed when the phone wakes from a push on cellular.
-        ...(ts.ip ? [`ws://${ts.ip}:${cfg.appPort}`] : []),
-        ...(ts.dns ? [`ws://${ts.dns}:${cfg.appPort}`] : []),
-        ...lanIps().map((ip) => `ws://${ip}:${cfg.appPort}`),
-      ];
+      const urls = hubUrls(cfg.appPort, ts, lanIps(), mdnsName());
       const info: PairingInfo = { v: PROTOCOL_VERSION, name: hostname().replace(/\.local$/, ''), urls, token: cfg.appToken };
       const text = JSON.stringify(info);
       qrcode.generate(text, { small: true });
       const png = join(CONFIG_PATH, '..', 'pair.png');
+      // The QR holds the token: only this user may read it.
       await QR.toFile(png, text, { width: 640, margin: 2 });
+      chmodSync(png, 0o600);
       if (!flags['no-open']) platform.openFile(png);
       const say = pairTexts(platform.id);
       console.log(say.scan);

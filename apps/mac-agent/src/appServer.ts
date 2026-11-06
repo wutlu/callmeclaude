@@ -7,6 +7,7 @@ import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
 import { DATA_DIR, LOG_DIR, saveConfig, writeAtomic, type Mode } from './config.ts';
 import type { Hub } from './hub.ts';
 import { audit, log, shortId } from './util.ts';
+import { currentHubUrls } from './addresses.ts';
 
 const DEVICES_PATH = join(DATA_DIR, 'devices.json');
 
@@ -28,6 +29,8 @@ interface Client {
 /** Phone-facing WebSocket server (bind on all interfaces; reach it via Tailscale on the road). */
 export class AppServer {
   private wss?: WebSocketServer;
+  /** The hub's current addresses, sent with every hello; refreshed every minute (Wi-Fi changes, Tailscale up/down). */
+  private urls: string[] = [];
   private clients = new Set<Client>();
   private devices: Record<string, Device> = {};
   private snapTimer?: NodeJS.Timeout;
@@ -41,6 +44,9 @@ export class AppServer {
   }
 
   start() {
+    const refresh = () => currentHubUrls(this.hub.cfg.appPort).then((u) => (this.urls = u)).catch(() => {});
+    void refresh();
+    setInterval(refresh, 60_000).unref();
     this.wss = new WebSocketServer({ port: this.hub.cfg.appPort, host: '0.0.0.0', maxPayload: 1 << 20 });
     this.wss.on('connection', (ws, req) => this.onConnection(ws, req.socket.remoteAddress ?? '?'));
     this.wss.on('listening', () => log.info(`app server on 0.0.0.0:${this.hub.cfg.appPort}`));
@@ -101,7 +107,7 @@ export class AppServer {
         this.clients.add(client);
         this.touch(client.device);
         audit('app.connect', { addr, device: client.device });
-        send({ type: 'hello', v: PROTOCOL_VERSION, snapshot: this.hub.st.snapshot() });
+        send({ type: 'hello', v: PROTOCOL_VERSION, snapshot: this.hub.st.snapshot(), ...(this.urls.length ? { urls: this.urls } : {}) });
         // A call may be ringing while the app just woke up from the push.
         if (this.hub.calls.ringing) send({ type: 'call.incoming', callId: this.hub.calls.ringing.callId, title: 'Claude' });
         return;

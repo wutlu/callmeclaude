@@ -122,7 +122,8 @@ data class Snapshot(
 
 /** Hub -> App text frames. Binary frames (audio) never reach this parser. */
 sealed interface HubMessage {
-    data class Hello(val v: Int, val snapshot: Snapshot?) : HubMessage
+    /** [urls]: the hub's current addresses (newer hubs); replace the saved ones, see [mergedUrls]. */
+    data class Hello(val v: Int, val snapshot: Snapshot?, val urls: List<String>? = null) : HubMessage
     data class SnapshotUpdate(val snapshot: Snapshot?) : HubMessage
     data class Heartbeat(val ts: String) : HubMessage
     data class CallIncoming(val callId: String, val title: String) : HubMessage
@@ -143,7 +144,11 @@ sealed interface HubMessage {
             }
             val type = o.opt("type") as? String ?: return null
             return when (type) {
-                "hello" -> Hello(o.optInt("v", 0), snapshotOf(o))
+                "hello" -> Hello(
+                    o.optInt("v", 0),
+                    snapshotOf(o),
+                    (o.opt("urls") as? JSONArray)?.let { a -> (0 until a.length()).mapNotNull { a.opt(it) as? String } },
+                )
                 "snapshot" -> SnapshotUpdate(snapshotOf(o))
                 "heartbeat" -> Heartbeat(o.optString("ts"))
                 "call.incoming" -> CallIncoming(o.optString("callId"), o.optString("title", "Claude"))
@@ -196,3 +201,12 @@ object AppMessages {
 }
 
 enum class Decision(val wire: String) { APPROVE("approve"), DENY("deny"), RELEASE("release") }
+
+/**
+ * The hub's addresses from hello replace the saved ones, so a new Wi-Fi or IP needs no re-pairing.
+ * Only ws:// / wss:// and at most 12; null = keep the saved list (nothing new or nothing usable).
+ */
+fun mergedUrls(saved: List<String>, fromHub: List<String>?): List<String>? {
+    val valid = fromHub.orEmpty().filter { (it.startsWith("ws://") || it.startsWith("wss://")) && it.length < 300 }.take(12)
+    return if (valid.isEmpty() || valid == saved) null else valid
+}
