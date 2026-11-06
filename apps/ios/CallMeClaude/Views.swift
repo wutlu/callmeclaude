@@ -311,6 +311,20 @@ struct SettingsView: View {
                     Text("Claude speaks this language on calls and writes session summaries in it. Takes full effect from the next call.")
                 }
 
+                if let current = hub.snapshot?.doneAlert {
+                    Section {
+                        Picker("Spoken alert", selection: Binding(get: { current }, set: { hub.setDoneAlert($0) })) {
+                            Text("On this phone").tag("phone")
+                            Text("On the Mac").tag("computer")
+                            Text("Off").tag("off")
+                        }
+                    } header: {
+                        Text("When a session finishes")
+                    } footer: {
+                        Text("Says “<project>: task complete.” in the voice language when a Claude Code session finishes. On this phone it plays while the app is open and connected.")
+                    }
+                }
+
                 Section("Mac") {
                     LabeledContent("Name", value: hub.pairing?.name ?? "—")
                     LabeledContent("Status", value: hub.connected ? "Connected" : "Offline")

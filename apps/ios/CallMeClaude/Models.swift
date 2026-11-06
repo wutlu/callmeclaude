@@ -36,6 +36,8 @@ struct Snapshot: Codable, Equatable {
     var hubVersion: String
     var sessions: [SessionCard]
     var pending: [PendingCard]
+    /// Spoken "task complete" alerts: "off", "computer" or "phone"; nil from older hubs.
+    var doneAlert: String?
 }
 
 enum SessionStateUI {

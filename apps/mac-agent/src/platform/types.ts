@@ -87,6 +87,8 @@ export interface Platform {
   isLanInterface(name: string): boolean;
   /** Open a file with the desktop's default viewer (best effort). */
   openFile(path: string): void;
+  /** Say `text` out loud on this computer in `language` (BCP-47) with the OS voice; resolves when done. Throws if nothing can speak. */
+  speak(text: string, language: string): Promise<void>;
   /** OS-specific security patterns used by the brain's tool guard. */
   security: {
     protectedPaths: RegExp[];

@@ -50,6 +50,37 @@ async function peekaboo() {
 }
 
 /** The computer task's tool instructions on macOS (moved verbatim from brain.ts). */
+const CHIME = '/System/Library/Sounds/Glass.aiff';
+
+/** Good default voices per locale; the first installed one wins (Siri voices can't be picked by `say -v`). */
+const PREFERRED_VOICES = ['Samantha', 'Daniel', 'Yelda', 'Anna', 'Thomas', 'Amélie', 'Mónica', 'Paulina', 'Alice', 'Luciana', 'Joana', 'Xander', 'Ellen', 'Zosia', 'Milena', 'Majed', 'Lekha', 'Kyoko', 'Yuna', 'Tingting'];
+
+/**
+ * The `say` voice for a BCP-47 language from `say -v '?'` output (pure, for tests). Exact locale first
+ * (tr-TR → tr_TR), then the same language; among those a well-known voice. undefined = the system voice.
+ */
+export function pickSayVoice(listing: string, language: string): string | undefined {
+  const voices = listing
+    .split('\n')
+    .map((l) => /^(.+?)\s+([a-z]{2,3})[_-]([A-Za-z0-9]+)\s+#/.exec(l))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => ({ name: m[1].trim(), lang: m[2], region: m[3].toUpperCase() }));
+  const [lang, region] = language.split('-');
+  const exact = voices.filter((v) => v.lang === lang && (!region || v.region === region.toUpperCase()));
+  const same = exact.length ? exact : voices.filter((v) => v.lang === lang);
+  if (!same.length) return undefined;
+  return (PREFERRED_VOICES.map((p) => same.find((v) => v.name === p)).find(Boolean) ?? same[0]).name;
+}
+
+const voiceCache = new Map<string, string | undefined>();
+async function sayVoice(language: string) {
+  if (!voiceCache.has(language)) {
+    const { stdout } = await execFileP('say', ['-v', '?'], { encoding: 'utf8' }).catch(() => ({ stdout: '' }));
+    voiceCache.set(language, pickSayVoice(stdout, language));
+  }
+  return voiceCache.get(language);
+}
+
 export const DARWIN_TOOLS_BLOCK = `Tools (prefer them in this order):
 - For the desktop and apps, use the Peekaboo MCP first (mcp__peekaboo__*): "see"/"image" to look at the screen (with window and element ids), then "click", "type", "hotkey", "app", "window", "scroll". Peekaboo has its own screen and accessibility permissions; the hub service has none.
 - For a web page you may also use the Claude in Chrome tools (mcp__claude-in-chrome__*) if they are available: find the tab, read the page, click, fill forms.
@@ -152,6 +183,11 @@ export const darwin: Platform = {
   isLanInterface: (name) => !name.startsWith('utun'),
   openFile(path) {
     spawnSync('open', [path]);
+  },
+  async speak(text, language) {
+    const voice = await sayVoice(language);
+    if (existsSync(CHIME)) await execFileP('afplay', ['-v', '0.5', CHIME]).catch(() => {});
+    await execFileP('say', [...(voice ? ['-v', voice] : []), text], { timeout: 60_000 });
   },
 
   security: {

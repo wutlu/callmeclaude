@@ -40,6 +40,12 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
     private let audio = AudioIO()
     private let hub = HubClient.shared
     private let synth = AVSpeechSynthesizer()
+    /// Short "task complete" alerts outside calls; its own audio session, so it ducks music and uses the headset.
+    private let announcer: AVSpeechSynthesizer = {
+        let s = AVSpeechSynthesizer()
+        s.usesApplicationAudioSession = false
+        return s
+    }()
     private let micOn = AtomicFlag()
 
     override init() {
@@ -59,6 +65,16 @@ final class CallManager: NSObject, ObservableObject, CXProviderDelegate {
         }
         hub.onAudio = { [weak self] d in self?.audio.play(d) }
         hub.onFlush = { [weak self] in self?.audio.flush() }
+        hub.onAnnounce = { [weak self] text, lang in
+            DispatchQueue.main.async {
+                // Never over a call: Claude is already talking there.
+                guard let self, self.active == nil else { return }
+                let u = AVSpeechUtterance(string: text)
+                u.voice = AVSpeechSynthesisVoice(language: lang) ?? AVSpeechSynthesisVoice(language: "en-US")
+                self.announcer.speak(u)
+                Log.d("announce: \(text)")
+            }
+        }
         hub.onIncoming = { [weak self] callId, title in
             DispatchQueue.main.async { self?.reportIncoming(callId: callId, title: title) }
         }

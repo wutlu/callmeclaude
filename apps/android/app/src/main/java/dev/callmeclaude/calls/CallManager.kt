@@ -18,6 +18,7 @@ import android.telecom.TelecomManager
 import dev.callmeclaude.AppLog
 import dev.callmeclaude.HubClient
 import dev.callmeclaude.HubErrors
+import dev.callmeclaude.Speaker
 import dev.callmeclaude.HubMessage
 import dev.callmeclaude.AppMessages
 import dev.callmeclaude.HubService
@@ -104,6 +105,8 @@ class CallManager(
 
     /** Read on OkHttp's reader thread. */
     @Volatile private var audioOn = false
+
+    private val announcer = Speaker(context)
 
     init {
         registerAccount()
@@ -251,6 +254,8 @@ class CallManager(
             HubMessage.AudioFlush -> audio.flush()
             is HubMessage.Transcript -> if (machine.active != null) addLine(Line(m.role, m.text, m.final))
             is HubMessage.Error -> if (errors.accept(m.message)) dispatch(Event.HubError(m.message))
+            // Never over a call: Claude is already talking there.
+            is HubMessage.Announce -> if (machine.active == null) announcer.say(m.text, m.language)
             else -> Unit
         }
     }

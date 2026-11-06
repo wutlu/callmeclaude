@@ -36,6 +36,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- The pairing token must not leave the device: no cloud backup, no device-to-device transfer. -->
+    <!-- Android 11+ package visibility: lets Speaker find the text-to-speech engine. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:name=".CallMeClaudeApp"
         android:allowBackup="false"

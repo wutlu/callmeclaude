@@ -16,6 +16,7 @@
 | `call.end` | `callId` | Kapat / reddet |
 | `mode.set` | `mode` | desk · away · ride · sleep |
 | `ring.set` | `target` | Arama nereye: `computer` (masaüstü uygulaması; açık değilse telefon) · `phone` · `off` (aranmaz, güncellemeler bir sonraki konuşmada) |
+| `alert.set` | `target` | Oturum bitince sesli bildirim: `computer` (hub bilgisayarda kendisi seslendirir) · `phone` (telefon uygulaması `announce` alır) · `off` |
 | `pending.resolve` | `pendingId`, `decision`, `note?` | Ekrandan onay/ret/bırak |
 | `device.lock` | `locked` | Kilit ekranı açık mı; bağlanınca ve her değişimde. Kilitliyken sesli asistan yalnızca sorulara cevap verir, değişiklik yapamaz |
 | `panic` / `resume` / `ping` | | |
@@ -24,13 +25,14 @@
 | type | alanlar | |
 |---|---|---|
 | `hello` | `v`, `snapshot` | Auth başarılı |
-| `snapshot` | `snapshot` | Oturum/karar listesi değişti. `ringTarget` ve çalan/süren arama (`call: {callId, state, on, title}`) da burada |
+| `snapshot` | `snapshot` | Oturum/karar listesi değişti. `ringTarget` `doneAlert` ve çalan/süren arama (`call: {callId, state, on, title}`) da burada |
 | `heartbeat` | `ts` | 15 sn'de bir |
 | `call.incoming` | `callId`, `title` | Yalnızca çalan tarafa (`ringTarget`'a göre masaüstü ya da telefon); telefonda push'a ek olarak |
 | `call.ready` / `call.ended` | `callId`, `reason?` | |
 | `audio.flush` | | Kullanıcı araya girdi, kuyruktaki sesi at |
 | `transcript` | `role`, `text`, `final` | Altyazı |
 | `error` | `message` | |
+| `announce` | `text`, `language` | Yalnızca telefonlara, `doneAlert: "phone"` iken: metni cihazın kendi sesiyle `language` dilinde oku |
 
 ## VoIP push (APNs, `apns-push-type: voip`, topic `<bundle>.voip`)
 ```json

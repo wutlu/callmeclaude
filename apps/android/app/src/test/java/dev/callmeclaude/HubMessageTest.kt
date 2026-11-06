@@ -105,4 +105,15 @@ class HubMessageTest {
         assertEquals("panic", JSONObject(AppMessages.panic()).getString("type"))
         assertEquals("resume", JSONObject(AppMessages.resume()).getString("type"))
     }
+
+    @Test fun parsesAnnounceAndDoneAlert() {
+        val a = HubMessage.parse("""{"type":"announce","text":"acme projesi görevi tamamlandı.","language":"tr-TR"}""")
+        assertEquals(HubMessage.Announce("acme projesi görevi tamamlandı.", "tr-TR"), a)
+        val withAlert = JSONObject(snapshotJson).put("doneAlert", "phone")
+        assertEquals("phone", (HubMessage.parse("""{"type":"snapshot","snapshot":$withAlert}""") as HubMessage.SnapshotUpdate).snapshot!!.doneAlert)
+        assertNull((HubMessage.parse("""{"type":"snapshot","snapshot":$snapshotJson}""") as HubMessage.SnapshotUpdate).snapshot!!.doneAlert)
+        val set = JSONObject(AppMessages.alertSet("computer"))
+        assertEquals("alert.set", set.getString("type"))
+        assertEquals("computer", set.getString("target"))
+    }
 }

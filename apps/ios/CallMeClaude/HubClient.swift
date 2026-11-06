@@ -22,6 +22,8 @@ final class HubClient: NSObject, ObservableObject {
     var onIncoming: ((String, String) -> Void)?
     var onCallReady: ((String) -> Void)?
     var onCallEnded: ((String, String) -> Void)?
+    /// Say this out loud (text, BCP-47 language): a session finished and alerts go to the phone.
+    var onAnnounce: ((String, String) -> Void)?
     /// Fired after every successful (re)connection + hello.
     var onConnected: (() -> Void)?
 
@@ -320,6 +322,8 @@ final class HubClient: NSObject, ObservableObject {
             onCallEnded?(obj["callId"] as? String ?? "", obj["reason"] as? String ?? "")
         case "audio.flush":
             onFlush?()
+        case "announce":
+            if let text = obj["text"] as? String, !text.isEmpty { onAnnounce?(text, obj["language"] as? String ?? "en-US") }
         case "error":
             Log.d("hub error: \(obj["message"] as? String ?? "?")")
         default: break
@@ -347,6 +351,7 @@ final class HubClient: NSObject, ObservableObject {
 
     func setMode(_ m: String) { sendJSON(["type": "mode.set", "mode": m]) }
     func setLanguage(_ code: String) { sendJSON(["type": "language.set", "language": code]) }
+    func setDoneAlert(_ target: String) { sendJSON(["type": "alert.set", "target": target]) }
     func panic() { sendJSON(["type": "panic"]) }
     func resume() { sendJSON(["type": "resume"]) }
     func resolve(_ pendingId: String, _ decision: String, note: String? = nil) {

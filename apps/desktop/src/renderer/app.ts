@@ -1,7 +1,7 @@
 // The panel: hub link, call handling, and the same controls as the phone app.
 import type { AppToHub, HubToApp, PendingCard, SessionCard, Snapshot } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
-import { LANGUAGES, MODES, RING_TARGETS, stateLabel, type HubConfig, type View } from '../shared.ts';
+import { DONE_ALERTS, LANGUAGES, MODES, RING_TARGETS, stateLabel, type HubConfig, type View } from '../shared.ts';
 import { CallAudio, Ringer } from './audio.ts';
 import { trayIcons } from './icons.ts';
 import { icon, stateIcon } from './ui-icons.ts';
@@ -215,6 +215,7 @@ cmc.onCommand((c) => {
     case 'mute':
       return toggleMute();
     case 'ring.set':
+    case 'alert.set':
     case 'mode.set':
     case 'pending.resolve':
     case 'resume':
@@ -244,6 +245,7 @@ function clock(ms: number) {
 }
 
 const RING_ICON: Record<string, string> = { computer: 'monitor', phone: 'smartphone', off: 'bellOff' };
+const ALERT_ICON: Record<string, string> = { computer: 'monitor', phone: 'smartphone', off: 'bellOff' };
 const MODE_ICON: Record<string, string> = { desk: 'keyboard', away: 'walk', ride: 'bike', sleep: 'moon' };
 
 /** Claude's round avatar, as on the phone's call screen. */
@@ -415,6 +417,8 @@ function renderPanel() {
       ${s?.pending.length ? section('Needs your decision', s.pending.length) + s.pending.map(pendingCard).join('') : ''}
       ${section('When Claude needs you')}
       ${tiles('ring', RING_TARGETS, RING_ICON, s?.ringTarget, online)}
+      ${section('When a session finishes')}
+      ${tiles('alert', DONE_ALERTS, ALERT_ICON, s?.doneAlert, online && !!s?.doneAlert)}
       ${section('Mode')}
       ${tiles('mode', MODES, MODE_ICON, s?.mode, online)}
       ${section('Sessions', s?.sessions.length)}
@@ -451,6 +455,8 @@ document.addEventListener('click', (e) => {
       return send({ type: 'ring.set', target: el.dataset.v as any });
     case 'mode':
       return send({ type: 'mode.set', mode: el.dataset.v as any });
+    case 'alert':
+      return send({ type: 'alert.set', target: el.dataset.v as any });
     case 'reply':
       return sendReply(el.dataset.id!);
     case 'resolve':
