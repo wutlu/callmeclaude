@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Announcer, doneText, shouldAnnounce, speakableProject } from '../src/announce.ts';
-import { pickSayVoice } from '../src/platform/darwin.ts';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+// The Announcer writes audit lines: keep them out of the developer's real ~/.callmeclaude.
+process.env.CMC_HOME ??= mkdtempSync(join(tmpdir(), 'cmc-announce-'));
+
+const { Announcer, doneText, shouldAnnounce, speakableProject } = await import('../src/announce.ts');
+const { pickSayVoice } = await import('../src/platform/darwin.ts');
 
 test('the alert is in the configured language, unknown languages fall back to English', () => {
   assert.equal(doneText('claude-alert', 'tr-TR'), 'claude alert projesi görevi tamamlandı.');
