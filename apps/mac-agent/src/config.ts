@@ -13,6 +13,8 @@ export const BRAIN_DIR = join(DATA_DIR, 'brain');
 
 export type Mode = 'desk' | 'away' | 'ride' | 'sleep';
 export type RingTarget = 'computer' | 'phone' | 'off';
+/** Where "<project>: task complete." is said out loud when a session finishes a turn. */
+export type DoneAlertTarget = 'off' | 'computer' | 'phone';
 /** Where voice-started Claude Code sessions run: a detached tmux session, or a background `claude -p`. */
 export type VoiceSessions = 'tmux' | 'headless';
 
@@ -26,6 +28,8 @@ export interface Config {
   mode: Mode;
   /** Where calls ring: the desktop app, the phone, or nowhere. */
   ringTarget: RingTarget;
+  /** Spoken "task complete" alerts (off by default). Turns shorter than minSeconds stay silent. */
+  doneAlert: { target: DoneAlertTarget; minSeconds: number };
   /** BCP-47 code of the language the voice agent speaks and summaries are written in (e.g. en-US, tr-TR). */
   language: string;
   voice: {
@@ -86,6 +90,7 @@ export function defaultConfig(): Config {
     appToken: randomBytes(24).toString('base64url'),
     mode: 'away',
     ringTarget: 'phone',
+    doneAlert: { target: 'off', minSeconds: 20 },
     language: 'en-US',
     voice: { provider: 'gemini-live', model: 'gemini-3.8-live', voiceName: 'Puck' },
     claude: {

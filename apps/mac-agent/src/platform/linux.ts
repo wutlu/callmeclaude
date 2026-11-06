@@ -401,6 +401,12 @@ export const linux: Platform = {
   servicePath: () => linuxServicePath(homedir(), process.execPath),
   tailscaleBins: ['tailscale'],
   isLanInterface: (name) => !name.startsWith('tailscale'),
+  async speak(text, language) {
+    const lang = language.split('-')[0];
+    if (onPath('spd-say')) return void (await execFileP('spd-say', ['-w', '-l', lang, text], { timeout: 60_000 }));
+    for (const bin of ['espeak-ng', 'espeak']) if (onPath(bin)) return void (await execFileP(bin, ['-v', lang, text], { timeout: 60_000 }));
+    throw new Error('Nothing can speak on this computer. Install speech-dispatcher (spd-say) or espeak-ng.');
+  },
   openFile(path) {
     // xdg-open may stay in the foreground with some viewers: detach. Errors (headless box) are ignored.
     try {

@@ -22,6 +22,8 @@ export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
 export type Risk = 'low' | 'medium' | 'high' | 'critical';
 /** Where the hub rings: the desktop app on this computer, the phone, or nowhere (updates wait for the next conversation). */
 export type RingTarget = 'computer' | 'phone' | 'off';
+/** Where the hub says "<project>: task complete." when a Claude Code session finishes a turn: out loud on this computer, on the phone, or not at all. */
+export type DoneAlertTarget = 'off' | 'computer' | 'phone';
 /** Which kind of app is connected. Absent in auth = phone (older apps). */
 export type ClientKind = 'phone' | 'desktop';
 
@@ -69,6 +71,8 @@ export interface Snapshot {
   hubVersion: string;
   paused: boolean;
   ringTarget?: RingTarget;
+  /** Absent from older hubs (no spoken alerts). */
+  doneAlert?: DoneAlertTarget;
   call?: CallInfo;
 }
 
@@ -82,7 +86,9 @@ export type HubToApp =
   | { type: 'call.ended'; callId: string; reason: string }
   | { type: 'audio.flush' }
   | { type: 'transcript'; role: 'user' | 'assistant' | 'system'; text: string; final: boolean }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  /** Say this out loud now with the device's own voice, in `language` (BCP-47). Sent to phones when doneAlert is 'phone'. */
+  | { type: 'announce'; text: string; language: string };
 
 export type AppToHub =
   | { type: 'auth'; token: string; device: string; v: number; kind?: ClientKind }
@@ -91,6 +97,7 @@ export type AppToHub =
   | { type: 'mode.set'; mode: Mode }
   | { type: 'language.set'; language: string }
   | { type: 'ring.set'; target: RingTarget }
+  | { type: 'alert.set'; target: DoneAlertTarget }
   | { type: 'panic' }
   | { type: 'resume' }
   | { type: 'push.register'; token: string; kind: 'voip' }

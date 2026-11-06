@@ -111,7 +111,7 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
       return send({});
     }
     case 'UserPromptSubmit': {
-      const s = st.upsertSession(sid, input.cwd, { ...base, state: 'running', lastPrompt: String(input.prompt ?? ''), summary: 'Working.' });
+      const s = st.upsertSession(sid, input.cwd, { ...base, state: 'running', lastPrompt: String(input.prompt ?? ''), turnAt: new Date().toISOString(), summary: 'Working.' });
       return send(withQueued(hub, s, 'UserPromptSubmit'));
     }
     case 'PreToolUse':
@@ -149,7 +149,7 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
       if (watchOnly) {
         const msg = String(input.last_assistant_message ?? lastAssistantFromTranscript(input.transcript_path) ?? '');
         const c = quickClassify(msg);
-        st.upsertSession(sid, input.cwd, { ...base, lastMessage: msg, openTool: undefined, state: c.state, summary: c.summary });
+        hub.announcer.done(st.upsertSession(sid, input.cwd, { ...base, lastMessage: msg, openTool: undefined, state: c.state, summary: c.summary }));
         return send({});
       }
       return onStop(hub, input, base, send, res);
@@ -193,6 +193,7 @@ async function onStop(hub: Hub, input: Json, base: Partial<Session>, send: (b: o
     s.lastPrompt = `New instruction by phone: ${q.join(' / ')}`;
     return send({ decision: 'block', reason: `The developer said by phone (via CallMeClaude): ${q.join(' / ')}` });
   }
+  hub.announcer.done(s);
 
   // "Call me when it's done" overrides desk/sleep mode (but never a panic pause).
   const wanted = !st.paused && st.consumeCallback(s);

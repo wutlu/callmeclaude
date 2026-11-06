@@ -1,5 +1,5 @@
 // Pure helpers shared by the main process and the renderer (no Electron, no DOM): unit-tested in test/.
-import type { CallInfo, Mode, RingTarget, Snapshot } from '@callmeclaude/protocol';
+import type { CallInfo, DoneAlertTarget, Mode, RingTarget, Snapshot } from '@callmeclaude/protocol';
 
 export interface HubConfig {
   appPort: number;
@@ -59,6 +59,13 @@ export const RING_TARGETS: Array<{ id: RingTarget; label: string; hint: string }
   { id: 'computer', label: 'Call this computer', hint: 'Talk here with the microphone. No phone needed.' },
   { id: 'phone', label: 'Call my phone', hint: 'Your phone rings, like a normal call.' },
   { id: 'off', label: "Don't call", hint: 'Updates wait until you start a conversation.' },
+];
+
+/** Spoken "<project>: task complete." when a Claude Code session finishes, in the voice language. */
+export const DONE_ALERTS: Array<{ id: DoneAlertTarget; label: string; hint: string }> = [
+  { id: 'computer', label: 'This computer', hint: 'This computer says "<project>: task complete." out loud when a session finishes.' },
+  { id: 'phone', label: 'Phone', hint: 'The phone app says it out loud while it is connected to the hub.' },
+  { id: 'off', label: 'Silent', hint: 'No spoken alert when a session finishes.' },
 ];
 
 /** Same modes and words as the phone apps. */

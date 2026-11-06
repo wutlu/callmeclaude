@@ -2,7 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
-import type { AppToHub, ClientKind, HubToApp, RingTarget } from '@callmeclaude/protocol';
+import type { AppToHub, ClientKind, DoneAlertTarget, HubToApp, RingTarget } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
 import { DATA_DIR, LOG_DIR, saveConfig, writeAtomic, type Mode } from './config.ts';
 import type { Hub } from './hub.ts';
@@ -211,6 +211,9 @@ export class AppServer {
         return;
       case 'ring.set':
         if ((['computer', 'phone', 'off'] as RingTarget[]).includes(msg.target)) this.hub.setRingTarget(msg.target);
+        return;
+      case 'alert.set':
+        if ((['off', 'computer', 'phone'] as DoneAlertTarget[]).includes(msg.target)) this.hub.setDoneAlert(msg.target);
         return;
       case 'panic':
         return this.hub.controller.panic('app');

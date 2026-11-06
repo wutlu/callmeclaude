@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, screen, s
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { autostartEntry, hubDataDir, MODES, panelPosition, parseHubConfig, RING_TARGETS, stateLabel, trayLook, type TrayTone, type View } from './shared.ts';
+import { autostartEntry, DONE_ALERTS, hubDataDir, MODES, panelPosition, parseHubConfig, RING_TARGETS, stateLabel, trayLook, type TrayTone, type View } from './shared.ts';
 
 const SIZE = { width: 380, height: 620 };
 const isMac = process.platform === 'darwin';
@@ -180,6 +180,12 @@ function buildMenu(): Menu {
   items.push({ type: 'separator' });
 
   if (online) {
+    if (s!.doneAlert) {
+      items.push({
+        label: `Spoken alert when done: ${DONE_ALERTS.find((a) => a.id === s!.doneAlert)?.label ?? s!.doneAlert}`,
+        submenu: DONE_ALERTS.map((a) => ({ label: a.label, type: 'radio' as const, checked: s!.doneAlert === a.id, click: () => command({ type: 'alert.set', target: a.id }) })),
+      });
+    }
     items.push({
       label: `Mode: ${MODES.find((m) => m.id === s!.mode)?.label ?? s!.mode}`,
       submenu: MODES.map((m) => ({ label: `${m.label} — ${m.hint}`, type: 'radio' as const, checked: s!.mode === m.id, click: () => command({ type: 'mode.set', mode: m.id }) })),

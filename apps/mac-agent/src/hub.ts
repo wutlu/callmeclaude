@@ -1,6 +1,7 @@
+import { Announcer, doneText } from './announce.ts';
 import { AppServer } from './appServer.ts';
 import { Calls } from './calls.ts';
-import { loadConfig, saveConfig, type Config, type Mode, type RingTarget } from './config.ts';
+import { loadConfig, saveConfig, type Config, type DoneAlertTarget, type Mode, type RingTarget } from './config.ts';
 import { Controller } from './controller.ts';
 import { startHookServer } from './hookServer.ts';
 import { HUB_VERSION, State } from './state.ts';
@@ -56,16 +57,19 @@ export class Hub {
   calls: Calls;
   voice: VoiceManager;
   app: AppServer;
+  announcer: Announcer;
 
   constructor() {
     this.cfg = loadConfig();
     this.st = new State(this.cfg.mode);
     this.st.language = this.cfg.language;
     this.st.ringTarget = this.cfg.ringTarget;
+    this.st.doneAlert = this.cfg.doneAlert.target;
     this.controller = new Controller(this.st, this.cfg);
     this.calls = new Calls(this);
     this.voice = new VoiceManager(this);
     this.app = new AppServer(this);
+    this.announcer = new Announcer(this);
   }
 
   start() {
@@ -107,6 +111,16 @@ export class Hub {
     this.st.changed();
     audit('ring.target', { target: t });
     this.calls.kick();
+  }
+
+  /** Turn spoken "task complete" alerts off or send them to this computer / the phone; plays a sample there. */
+  setDoneAlert(t: DoneAlertTarget) {
+    this.cfg.doneAlert.target = t;
+    this.st.doneAlert = t;
+    saveConfig(this.cfg);
+    this.st.changed();
+    audit('done.alert', { target: t });
+    if (t !== 'off') this.announcer.say(doneText('CallMeClaude', this.cfg.language), t);
   }
 
   /** Sessions that look stuck: a tool started long ago and nothing happened since. */

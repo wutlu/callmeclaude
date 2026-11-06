@@ -39,6 +39,9 @@ import dev.callmeclaude.HubClient
 import dev.callmeclaude.warnings
 import java.util.Date
 
+/** Where the spoken "task complete" alert plays; same words as the desktop app and iOS. */
+val doneAlerts = listOf("phone" to "On this phone", "computer" to "On the computer", "off" to "Off")
+
 /** Voice languages (BCP-47), same list as iOS. The app UI stays in English; this is what Claude speaks on calls. */
 val languages = listOf(
     "en-US" to "English (US)", "en-GB" to "English (UK)", "tr-TR" to "Türkçe", "de-DE" to "Deutsch",
@@ -60,6 +63,7 @@ fun SettingsScreen(hub: HubClient, onDone: () -> Unit) {
     val problems = warnings(health.health)
     var confirmUnpair by remember { mutableStateOf(false) }
     var languageMenu by remember { mutableStateOf(false) }
+    var alertMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val uri = LocalUriHandler.current
     val appVersion = remember {
@@ -127,6 +131,24 @@ fun SettingsScreen(hub: HubClient, onDone: () -> Unit) {
                 }
             }
             Footer("Claude speaks this language on calls and writes session summaries in it. Takes full effect from the next call.")
+
+            snapshot?.doneAlert?.let { current ->
+                SectionTitle("When a session finishes")
+                Card {
+                    Box {
+                        Row(Modifier.fillMaxWidth().clickable { alertMenu = true }.padding(vertical = 4.dp)) {
+                            Text("Spoken alert", modifier = Modifier.weight(1f))
+                            Text(doneAlerts.firstOrNull { it.first == current }?.second ?: current, color = Palette.accent)
+                        }
+                        DropdownMenu(expanded = alertMenu, onDismissRequest = { alertMenu = false }) {
+                            doneAlerts.forEach { (id, name) ->
+                                DropdownMenuItem(text = { Text(name) }, onClick = { alertMenu = false; hub.setDoneAlert(id) })
+                            }
+                        }
+                    }
+                }
+                Footer("Says \"<project>: task complete.\" in the voice language when a Claude Code session finishes. On this phone it plays through your headset or intercom when one is connected.")
+            }
 
             SectionTitle("About")
             Card {

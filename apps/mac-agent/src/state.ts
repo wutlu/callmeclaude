@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { CallInfo, PendingCard, RingTarget, SessionCard, SessionState, Snapshot, Risk } from '@callmeclaude/protocol';
+import type { CallInfo, DoneAlertTarget, PendingCard, RingTarget, SessionCard, SessionState, Snapshot, Risk } from '@callmeclaude/protocol';
 import { STATE_PATH, writeAtomic, type Mode } from './config.ts';
 import { log } from './util.ts';
 
@@ -20,6 +20,8 @@ export interface Session {
   startedAt: string;
   updatedAt: string;
   lastToolAt?: string;
+  /** When the current turn began (the last prompt, or the last Stop for a continued session): its length decides the spoken alert. */
+  turnAt?: string;
   openTool?: string;
   /** Running as a headless `claude -p` the hub started (fork, resume or voice start): there is no window. */
   background?: boolean;
@@ -85,6 +87,7 @@ export class State extends EventEmitter {
   language = 'en-US';
   paused = false;
   ringTarget: RingTarget = 'phone';
+  doneAlert: DoneAlertTarget = 'off';
   /** The call ringing or in progress (set by Calls / VoiceManager). */
   call?: CallInfo;
   private saveTimer?: NodeJS.Timeout;
@@ -231,6 +234,7 @@ export class State extends EventEmitter {
       language: this.language,
       paused: this.paused,
       ringTarget: this.ringTarget,
+      doneAlert: this.doneAlert,
       ...(this.call ? { call: this.call } : {}),
       hubVersion: HUB_VERSION,
       sessions: this.activeSessions().map(toCard(this)),

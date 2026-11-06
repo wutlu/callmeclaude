@@ -84,6 +84,8 @@ data class Snapshot(
     val hubVersion: String,
     val sessions: List<SessionCard>,
     val pending: List<PendingCard>,
+    /** Spoken "task complete" alerts: "off", "computer" or "phone"; null from older hubs (no such setting). */
+    val doneAlert: String? = null,
 ) {
     companion object {
         fun fromJson(o: JSONObject): Snapshot = Snapshot(
@@ -91,6 +93,7 @@ data class Snapshot(
             language = o.optString("language").ifEmpty { null },
             paused = o.optBoolean("paused", false),
             hubVersion = o.optString("hubVersion"),
+            doneAlert = o.optString("doneAlert").ifEmpty { null },
             sessions = o.optJSONArray("sessions").objects().map {
                 SessionCard(
                     id = it.getString("id"),
@@ -132,6 +135,8 @@ sealed interface HubMessage {
     data object AudioFlush : HubMessage
     data class Transcript(val role: String, val text: String, val final: Boolean) : HubMessage
     data class Error(val message: String) : HubMessage
+    /** Say [text] out loud now in [language] (BCP-47): a session finished and the developer chose "on my phone". */
+    data class Announce(val text: String, val language: String) : HubMessage
     data class Unknown(val type: String) : HubMessage
 
     companion object {
@@ -157,6 +162,7 @@ sealed interface HubMessage {
                 "audio.flush" -> AudioFlush
                 "transcript" -> Transcript(o.optString("role"), o.optString("text"), o.optBoolean("final"))
                 "error" -> Error(o.optString("message", "?"))
+                "announce" -> Announce(o.optString("text"), o.optString("language", "en-US"))
                 else -> Unknown(type)
             }
         }
@@ -177,6 +183,7 @@ object AppMessages {
 
     fun modeSet(mode: String): String = JSONObject().put("type", "mode.set").put("mode", mode).toString()
     fun languageSet(code: String): String = JSONObject().put("type", "language.set").put("language", code).toString()
+    fun alertSet(target: String): String = JSONObject().put("type", "alert.set").put("target", target).toString()
     fun panic(): String = JSONObject().put("type", "panic").toString()
     fun resume(): String = JSONObject().put("type", "resume").toString()
     fun ping(): String = JSONObject().put("type", "ping").toString()
