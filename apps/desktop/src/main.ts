@@ -42,8 +42,17 @@ function start() {
     if (shot) {
       win!.webContents.once('did-finish-load', () =>
         setTimeout(async () => {
-          const img = await win!.webContents.capturePage();
-          writeFileSync(shot, img.toPNG());
+          // Capturing a hidden window sometimes fails under Xvfb (UnknownVizError): retry, then exit 1, never hang.
+          for (let i = 1; ; i++) {
+            try {
+              writeFileSync(shot, (await win!.webContents.capturePage()).toPNG());
+              break;
+            } catch (e) {
+              console.error(`snapshot attempt ${i} failed: ${(e as Error).message}`);
+              if (i === 5) return app.exit(1);
+              await new Promise((r) => setTimeout(r, 1000));
+            }
+          }
           console.log(`snapshot ${shot} tray=${icons.size} link=${view.link}`);
           quitting = true;
           app.quit();
