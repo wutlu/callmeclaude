@@ -183,8 +183,13 @@ function buildMenu(): Menu {
         submenu: [
           { label: clipText(p.summary, 120), enabled: false },
           { type: 'separator' },
-          { label: 'Approve', click: () => command({ type: 'pending.resolve', pendingId: p.id, decision: 'approve' }) },
-          { label: 'Deny', click: () => command({ type: 'pending.resolve', pendingId: p.id, decision: 'deny' }) },
+          // A waiting session needs a written reply (in the panel), not a bare yes.
+          ...(p.kind === 'permission'
+            ? [
+                { label: 'Approve', click: () => command({ type: 'pending.resolve', pendingId: p.id, decision: 'approve' }) },
+                { label: 'Deny', click: () => command({ type: 'pending.resolve', pendingId: p.id, decision: 'deny' }) },
+              ]
+            : [{ label: 'Reply…', click: () => showWindow() }]),
           { label: 'Let it stop', click: () => command({ type: 'pending.resolve', pendingId: p.id, decision: 'release' }) },
         ],
       });

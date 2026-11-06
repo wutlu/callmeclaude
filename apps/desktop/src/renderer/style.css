@@ -83,6 +83,8 @@ code { font-size: 12px; user-select: text; }
 .tag { font-size: 10px; color: var(--muted); border: 1px solid var(--stroke); border-radius: 6px; padding: 1px 6px; }
 .pending.risk-high, .pending.risk-critical { border-color: color-mix(in srgb, var(--red) 55%, transparent); }
 .pending .row { margin-top: 8px; }
+.reply { display: block; width: 100%; margin-top: 8px; resize: vertical; font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--stroke); border-radius: 8px; padding: 6px 8px; user-select: text; }
+.reply:focus { outline: none; border-color: var(--accent); }
 .sessions { list-style: none; margin: 0; padding: 0; }
 .session { display: flex; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--stroke); }
 .session p { margin: 2px 0 0; }

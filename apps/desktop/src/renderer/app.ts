@@ -30,6 +30,8 @@ let confirmPanic = false;
 let loginItem = false;
 let lastMessageAt = 0;
 let platform = '';
+/** Unsent replies to waiting sessions, by pending id (the panel re-renders on every hub update). */
+const drafts = new Map<string, string>();
 const ringer = new Ringer();
 const audio = new CallAudio((pcm) => ws?.readyState === WebSocket.OPEN && ws.send(pcm));
 
@@ -293,9 +295,19 @@ cmc setup --gemini-key &lt;KEY&gt;</pre>
 }
 
 function pendingCard(p: PendingCard): string {
-  return `<section class="card pending risk-${p.risk}">
+  const head = `<section class="card pending risk-${p.risk}">
     <div class="row between"><h3>${esc(p.project)}</h3><span class="tag">${p.kind === 'permission' ? 'Permission' : 'Waiting'}</span></div>
-    <p>${esc(p.summary)}</p>
+    <p>${esc(p.summary)}</p>`;
+  // A waiting session asked something or finished: it needs words, not a yes (a bare "Approved, go ahead." answers nothing).
+  if (p.kind !== 'permission') {
+    return `${head}
+    <textarea class="reply" data-reply="${esc(p.id)}" rows="2" placeholder="Reply to Claude… (Enter sends)">${esc(drafts.get(p.id) ?? '')}</textarea>
+    <div class="row">
+      <button class="btn small green" data-a="reply" data-id="${esc(p.id)}">Send</button>
+      <button class="btn small" data-a="resolve" data-id="${esc(p.id)}" data-d="release">Let it stop</button>
+    </div></section>`;
+  }
+  return `${head}
     <div class="row">
       <button class="btn small green" data-a="resolve" data-id="${esc(p.id)}" data-d="approve">Approve</button>
       <button class="btn small" data-a="resolve" data-id="${esc(p.id)}" data-d="deny">Deny</button>
@@ -317,6 +329,30 @@ function segmented<T extends string>(name: string, opts: Array<{ id: T; label: s
 }
 
 function render() {
+  // Keep the reply being typed (and the caret) across re-renders.
+  const typing = document.activeElement as HTMLTextAreaElement | null;
+  const typingId = typing?.dataset?.reply;
+  const caret = typingId ? [typing!.selectionStart, typing!.selectionEnd] : undefined;
+  renderPanel();
+  if (typingId) {
+    const t = document.querySelector(`textarea[data-reply="${CSS.escape(typingId)}"]`) as HTMLTextAreaElement | null;
+    if (t) {
+      t.focus();
+      t.setSelectionRange(caret![0], caret![1]);
+    }
+  }
+}
+
+function sendReply(id: string) {
+  const text = (drafts.get(id) ?? '').trim();
+  const box = document.querySelector(`textarea[data-reply="${CSS.escape(id)}"]`) as HTMLTextAreaElement | null;
+  if (!text) return box?.focus();
+  drafts.delete(id);
+  if (box) box.value = '';
+  send({ type: 'pending.resolve', pendingId: id, decision: 'approve', note: text });
+}
+
+function renderPanel() {
   const s = snapshot;
   const online = link === 'online' && !!s;
   const closeBtn = platform === 'linux' ? '' : '<button class="icon" data-a="hide" title="Close">✕</button>';
@@ -367,6 +403,8 @@ document.addEventListener('click', (e) => {
       return send({ type: 'ring.set', target: el.dataset.v as any });
     case 'mode':
       return send({ type: 'mode.set', mode: el.dataset.v as any });
+    case 'reply':
+      return sendReply(el.dataset.id!);
     case 'resolve':
       return send({ type: 'pending.resolve', pendingId: el.dataset.id!, decision: el.dataset.d as any });
     case 'resume':
@@ -398,7 +436,17 @@ document.addEventListener('change', async (e) => {
   }
 });
 
+document.addEventListener('input', (e) => {
+  const el = e.target as HTMLTextAreaElement;
+  if (el.dataset?.reply) drafts.set(el.dataset.reply, el.value);
+});
+
 document.addEventListener('keydown', (e) => {
+  const id = (e.target as HTMLElement).dataset?.reply;
+  if (id && e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+    e.preventDefault();
+    return sendReply(id);
+  }
   if (e.key === 'Escape' && !local) cmc.hide();
 });
 
