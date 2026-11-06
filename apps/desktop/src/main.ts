@@ -19,7 +19,8 @@ let quitting = false;
 const icons = new Map<TrayTone, NativeImage>();
 let lastRinging: string | undefined;
 
-if (!app.requestSingleInstanceLock()) app.quit();
+// A screenshot run may happen next to the installed app, so it does not take the single-instance lock.
+if (!process.env.CMC_DESKTOP_SNAPSHOT && !app.requestSingleInstanceLock()) app.quit();
 else start();
 
 function start() {
@@ -43,6 +44,12 @@ function start() {
       win!.webContents.once('did-finish-load', () =>
         setTimeout(async () => {
           // Capturing a hidden window sometimes fails under Xvfb (UnknownVizError): retry, then exit 1, never hang.
+          // CMC_DESKTOP_SNAPSHOT_SCROLL=px shows the lower part of the panel.
+          const scroll = Number(process.env.CMC_DESKTOP_SNAPSHOT_SCROLL ?? 0);
+          if (scroll) {
+            await win!.webContents.executeJavaScript(`document.querySelector('main').scrollTop = ${scroll}`);
+            await new Promise((r) => setTimeout(r, 500)); // let it paint
+          }
           for (let i = 1; ; i++) {
             try {
               writeFileSync(shot, (await win!.webContents.capturePage()).toPNG());

@@ -4,6 +4,7 @@ import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
 import { LANGUAGES, MODES, RING_TARGETS, stateLabel, type HubConfig, type View } from '../shared.ts';
 import { CallAudio, Ringer } from './audio.ts';
 import { trayIcons } from './icons.ts';
+import { icon, stateIcon } from './ui-icons.ts';
 
 interface Bridge {
   hubConfig(): Promise<HubConfig | null>;
@@ -242,16 +243,23 @@ function clock(ms: number) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+const RING_ICON: Record<string, string> = { computer: 'monitor', phone: 'smartphone', off: 'bellOff' };
+const MODE_ICON: Record<string, string> = { desk: 'keyboard', away: 'walk', ride: 'bike', sleep: 'moon' };
+
+/** Claude's round avatar, as on the phone's call screen. */
+const avatar = (cls = '') => `<div class="avatar ${cls}"><img src="../icon.png" alt=""></div>`;
+
 function callCard(): string {
   if (local?.state === 'ringing') {
-    return `<section class="card call ringing">
-      <div class="pulse"></div>
+    return `<section class="callscreen ringing">
+      ${avatar('ring')}
       <h2>Claude is calling</h2>
       <p class="muted">${esc(snapshot?.call?.title ?? 'An update from your sessions')}</p>
-      <div class="row">
-        <button class="btn green" data-a="answer">Answer</button>
-        <button class="btn red" data-a="decline">Decline</button>
+      <div class="keys">
+        <button class="round red" data-a="decline" title="Decline">${icon('phoneOff')}</button>
+        <button class="round green" data-a="answer" title="Answer">${icon('phone')}</button>
       </div>
+      <div class="keylabels"><span>Decline</span><span>Answer</span></div>
     </section>`;
   }
   if (local) {
@@ -260,83 +268,117 @@ function callCard(): string {
       .slice(-6)
       .map((l) => `<p class="line ${l.role}"><b>${l.role === 'user' ? 'You' : 'Claude'}</b> ${esc(l.text)}</p>`)
       .join('');
-    return `<section class="card call active">
-      <div class="row between"><h2>${local.state === 'connecting' ? 'Connecting…' : 'On a call'}</h2><span class="muted" id="clock">${local.state === 'active' ? clock(Date.now() - callStarted) : ''}</span></div>
-      <div class="transcript">${talkLines || '<p class="muted">Say hello.</p>'}</div>
-      <div class="row">
-        <button class="btn" data-a="mute">${local.muted ? 'Unmute' : 'Mute'}</button>
-        <button class="btn red" data-a="hangup">Hang up</button>
+    return `<section class="callscreen active">
+      ${avatar(local.state === 'connecting' ? 'ring' : 'live')}
+      <h2>Claude</h2>
+      <p class="muted mono" id="clock">${local.state === 'active' ? clock(Date.now() - callStarted) : 'Connecting…'}</p>
+      <div class="transcript">${talkLines || '<p class="muted center">Say hello.</p>'}</div>
+      <div class="keys">
+        <button class="round ${local.muted ? 'lit' : 'dim'}" data-a="mute" title="${local.muted ? 'Unmute' : 'Mute'}">${icon(local.muted ? 'micOff' : 'mic')}</button>
+        <button class="round red" data-a="hangup" title="Hang up">${icon('phoneOff')}</button>
       </div>
+      <div class="keylabels"><span>${local.muted ? 'Unmute' : 'Mute'}</span><span>Hang up</span></div>
     </section>`;
   }
   if (snapshot?.call) {
     const where = snapshot.call.on === 'phone' ? 'on your phone' : 'on another computer';
-    return `<section class="card call elsewhere"><h2>${snapshot.call.state === 'ringing' ? 'Claude is calling' : 'On a call'} ${where}</h2>
-      <p class="muted">${esc(snapshot.call.title)}</p></section>`;
+    return `<section class="card elsewhere row">
+      <span class="badge green">${icon(snapshot.call.on === 'phone' ? 'smartphone' : 'monitor')}</span>
+      <div class="grow"><h3>${snapshot.call.state === 'ringing' ? 'Claude is calling' : 'On a call'} ${where}</h3>
+      <p class="muted clip">${esc(snapshot.call.title)}</p></div></section>`;
   }
-  return `<button class="btn talk" data-a="talk" ${link === 'online' ? '' : 'disabled'}>Talk to Claude</button>`;
+  const on = link === 'online';
+  return `<section class="hero">
+    <button class="callbtn" data-a="talk" ${on ? '' : 'disabled'} title="Talk to Claude">${icon('phone')}</button>
+    <h2>Talk to Claude</h2>
+    <p class="muted">${on ? "Uses this computer's microphone" : 'Waiting for the hub…'}</p>
+  </section>`;
 }
 
 function offlineCard(): string {
   if (platform === 'win32' && link !== 'online') {
-    return `<section class="card warn"><h3>The hub does not run on Windows yet</h3>
+    return `<section class="card warn"><div class="row"><span class="badge orange">${icon('info')}</span><h3>The hub does not run on Windows yet</h3></div>
       <p>CallMeClaude's hub (the part that watches Claude Code and calls you) runs on macOS and Linux today. Windows support is coming; this app connects as soon as a hub runs on this computer.</p></section>`;
   }
   if (link === 'setup') {
-    return `<section class="card warn"><h3>Set up the hub first</h3>
+    return `<section class="card warn"><div class="row"><span class="badge orange">${icon('terminal')}</span><h3>Set up the hub first</h3></div>
       <p>CallMeClaude's hub runs in the background on this computer and watches your Claude Code sessions. Install it once:</p>
       <pre>git clone https://github.com/wutlu/callmeclaude
 cd callmeclaude && pnpm install
 cmc setup --gemini-key &lt;KEY&gt;</pre>
       <p class="muted">This window connects as soon as it is running.</p></section>`;
   }
-  return `<section class="card warn"><h3>The hub is not running</h3>
+  return `<section class="card warn"><div class="row"><span class="badge orange">${icon('wifiOff')}</span><h3>The hub is not running</h3></div>
     <p>Start it in a terminal with <code>cmc restart</code>. This window reconnects by itself.</p></section>`;
 }
 
 /** Marks a session running without a window (a background copy the hub started), so two same-named cards are told apart. */
-const BG = ' <span class="bg" title="Runs in the background with no window: a copy CallMeClaude started for a phone or panel instruction.">Background</span>';
+const BG = ` <span class="bg" title="Runs in the background with no window: a copy CallMeClaude started for a phone or panel instruction.">${icon('layers')}Background</span>`;
 
 function pendingCard(p: PendingCard): string {
-  const head = `<section class="card pending risk-${p.risk}">
-    <div class="row between"><h3>${esc(p.project)}${p.background ? BG : ''}</h3><span class="tag">${p.kind === 'permission' ? 'Permission' : 'Waiting'}</span></div>
-    <p>${esc(p.summary)}</p>`;
-  // A waiting session asked something or finished: it needs words, not a yes (a bare "Approved, go ahead." answers nothing).
-  if (p.kind !== 'permission') {
-    return `${head}
-    <textarea class="reply" data-reply="${esc(p.id)}" rows="2" placeholder="Reply to Claude… (Enter sends)">${esc(drafts.get(p.id) ?? '')}</textarea>
+  const ask = p.kind === 'permission';
+  const risky = p.risk === 'high' || p.risk === 'critical';
+  const head = `<section class="card pending ${risky ? 'risky' : ''}">
     <div class="row">
-      <button class="btn small green" data-a="reply" data-id="${esc(p.id)}">Send</button>
-      <button class="btn small" data-a="resolve" data-id="${esc(p.id)}" data-d="release">Let it stop</button>
+      <span class="badge ${risky ? 'red' : 'orange'}">${icon(ask ? 'shield' : 'question')}</span>
+      <div class="grow"><div class="row between"><h3 class="clip">${esc(p.project)}${p.background ? BG : ''}</h3>
+      <span class="riskpill ${risky ? 'hot' : ''}">${ask ? esc(p.risk.toUpperCase()) : 'QUESTION'}</span></div></div>
+    </div>
+    <p class="summary">${esc(p.summary)}</p>`;
+  // A waiting session asked something or finished: it needs words, not a yes (a bare "Approved, go ahead." answers nothing).
+  if (!ask) {
+    return `${head}
+    <div class="replybox">
+      <textarea class="reply" data-reply="${esc(p.id)}" rows="2" placeholder="Reply to Claude… (Enter sends)">${esc(drafts.get(p.id) ?? '')}</textarea>
+      <button class="send" data-a="reply" data-id="${esc(p.id)}" title="Send">${icon('send')}</button>
+    </div>
+    <div class="row actions">
+      <button class="btn small ghost" data-a="resolve" data-id="${esc(p.id)}" data-d="release">${icon('stopCircle')}Let it stop</button>
     </div></section>`;
   }
   return `${head}
-    <div class="row">
-      <button class="btn small green" data-a="resolve" data-id="${esc(p.id)}" data-d="approve">Approve</button>
-      <button class="btn small" data-a="resolve" data-id="${esc(p.id)}" data-d="deny">Deny</button>
-      <button class="btn small" data-a="resolve" data-id="${esc(p.id)}" data-d="release">Let it stop</button>
+    <div class="row actions">
+      <button class="btn small green" data-a="resolve" data-id="${esc(p.id)}" data-d="approve">${icon('check')}Approve</button>
+      <button class="btn small" data-a="resolve" data-id="${esc(p.id)}" data-d="deny">${icon('x')}Deny</button>
+      <button class="btn small ghost" data-a="resolve" data-id="${esc(p.id)}" data-d="release">${icon('stopCircle')}Let it stop</button>
     </div></section>`;
 }
 
-function sessionRow(s: SessionCard): string {
-  return `<li class="session"><span class="dot st-${s.state}"></span>
-    <div class="grow"><div class="row between"><b>${esc(s.project)}${s.background ? BG : ''}</b><span class="st st-${s.state}">${stateLabel(s.state)}</span></div>
-    <p class="muted clip">${esc(s.summary)}</p><span class="time">${relative(s.updatedAt)}</span></div></li>`;
+function sessionCard(s: SessionCard): string {
+  return `<section class="card session">
+    <div class="row">
+      <span class="sticon st-${s.state}">${stateIcon(s.state)}</span>
+      <b class="grow clip">${esc(s.project)}${s.background ? BG : ''}</b>
+      <span class="st st-${s.state}">${stateLabel(s.state)}</span>
+    </div>
+    <p class="muted summary">${esc(s.summary)}</p>
+    <span class="time">${relative(s.updatedAt)}</span>
+  </section>`;
 }
 
-function segmented<T extends string>(name: string, opts: Array<{ id: T; label: string; hint: string }>, current: T | undefined, enabled: boolean) {
+function tiles<T extends string>(name: string, opts: Array<{ id: T; label: string; hint: string }>, icons: Record<string, string>, current: T | undefined, enabled: boolean) {
   const cur = opts.find((o) => o.id === current);
-  return `<div class="seg">${opts
-    .map((o) => `<button class="${o.id === current ? 'on' : ''}" data-a="${name}" data-v="${o.id}" ${enabled ? '' : 'disabled'}>${esc(o.label)}</button>`)
+  return `<div class="tiles">${opts
+    .map(
+      (o) =>
+        `<button class="${o.id === current ? 'on' : ''}" data-a="${name}" data-v="${o.id}" ${enabled ? '' : 'disabled'}>${icon(icons[o.id])}<span>${esc(o.label)}</span></button>`,
+    )
     .join('')}</div><p class="hint">${cur ? esc(cur.hint) : ''}</p>`;
 }
+
+const section = (title: string, count?: number) =>
+  `<div class="sechead"><span>${esc(title)}</span>${count ? `<span class="count">${count}</span>` : ''}</div>`;
 
 function render() {
   // Keep the reply being typed (and the caret) across re-renders.
   const typing = document.activeElement as HTMLTextAreaElement | null;
   const typingId = typing?.dataset?.reply;
   const caret = typingId ? [typing!.selectionStart, typing!.selectionEnd] : undefined;
+  // Keep the scroll position too: hub updates arrive every few seconds while sessions work.
+  const top = document.querySelector('main')?.scrollTop ?? 0;
   renderPanel();
+  const main = document.querySelector('main');
+  if (main) main.scrollTop = top;
   if (typingId) {
     const t = document.querySelector(`textarea[data-reply="${CSS.escape(typingId)}"]`) as HTMLTextAreaElement | null;
     if (t) {
@@ -358,31 +400,34 @@ function sendReply(id: string) {
 function renderPanel() {
   const s = snapshot;
   const online = link === 'online' && !!s;
-  const closeBtn = platform === 'linux' ? '' : '<button class="icon" data-a="hide" title="Close">✕</button>';
+  const closeBtn = platform === 'linux' ? '' : `<button class="icon" data-a="hide" title="Close">${icon('x')}</button>`;
+  const status = online ? 'Connected' : link === 'setup' ? 'Not set up' : 'Offline';
   $('#app').innerHTML = `
     <header class="row between">
-      <h1>CallMeClaude</h1>
-      <div class="row"><span class="pill ${online ? 'on' : 'off'}">${online ? 'Connected' : link === 'setup' ? 'Not set up' : 'Offline'}</span>${closeBtn}</div>
+      <div class="row brand"><img class="logo" src="../icon.png" alt=""><h1>CallMeClaude</h1></div>
+      <div class="row"><span class="pill ${online ? 'on' : 'off'}"><i></i>${status}</span>${closeBtn}</div>
     </header>
     <main>
-      ${notice ? `<div class="notice">${esc(notice)} <button class="link" data-a="dismiss">OK</button></div>` : ''}
+      ${notice ? `<div class="notice row">${icon('info')}<span class="grow">${esc(notice)}</span><button class="link" data-a="dismiss">OK</button></div>` : ''}
       ${online ? '' : offlineCard()}
       ${callCard()}
-      <h4>When Claude needs you</h4>
-      ${segmented('ring', RING_TARGETS, s?.ringTarget, online)}
-      ${s?.paused ? `<section class="card warn row between"><div><h3>Automation paused</h3><p class="muted">Sessions run; nothing is held or called.</p></div><button class="btn" data-a="resume">Resume</button></section>` : ''}
-      ${s?.pending.map(pendingCard).join('') ?? ''}
-      <h4>Mode</h4>
-      ${segmented('mode', MODES, s?.mode, online)}
-      <h4>Sessions${s ? ` · ${s.sessions.length}` : ''}</h4>
-      ${s?.sessions.length ? `<ul class="sessions">${s.sessions.map(sessionRow).join('')}</ul>` : `<p class="muted">${online ? 'No open Claude Code sessions.' : '—'}</p>`}
-      <h4>Settings</h4>
-      <label class="row between setting">Voice language
-        <select data-a="language" ${online ? '' : 'disabled'}>${LANGUAGES.map(([c, n]) => `<option value="${c}" ${s?.language === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
-      </label>
-      <label class="row between setting">Start at login <input type="checkbox" data-a="login" ${loginItem ? 'checked' : ''}></label>
-      <button class="btn red wide" data-a="panic" ${online && !s?.paused ? '' : 'disabled'}>${confirmPanic ? 'Click again: interrupt all sessions and pause' : 'Stop everything'}</button>
-      <p class="foot"><button class="link" data-a="repo">Source code (MIT)</button>${s ? ` · hub ${esc(s.hubVersion)}` : ''}</p>
+      ${s?.paused ? `<section class="card warn row"><span class="badge orange">${icon('pause')}</span><div class="grow"><h3>Automation paused</h3><p class="muted">Nothing is approved or held automatically.</p></div><button class="btn small" data-a="resume">Resume</button></section>` : ''}
+      ${s?.pending.length ? section('Needs your decision', s.pending.length) + s.pending.map(pendingCard).join('') : ''}
+      ${section('When Claude needs you')}
+      ${tiles('ring', RING_TARGETS, RING_ICON, s?.ringTarget, online)}
+      ${section('Mode')}
+      ${tiles('mode', MODES, MODE_ICON, s?.mode, online)}
+      ${section('Sessions', s?.sessions.length)}
+      ${s?.sessions.length ? s.sessions.map(sessionCard).join('') : `<section class="card"><p class="muted">${online ? 'No open Claude Code sessions.' : 'Waiting for the hub…'}</p></section>`}
+      ${section('Settings')}
+      <section class="card settings">
+        <label class="row setting">${icon('globe')}<span class="grow">Voice language</span>
+          <select data-a="language" ${online ? '' : 'disabled'}>${LANGUAGES.map(([c, n]) => `<option value="${c}" ${s?.language === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
+        </label>
+        <label class="row setting">${icon('power')}<span class="grow">Start at login</span><input type="checkbox" class="switch" data-a="login" ${loginItem ? 'checked' : ''}></label>
+      </section>
+      <button class="btn danger wide" data-a="panic" ${online && !s?.paused ? '' : 'disabled'}>${icon('octagonX')}${confirmPanic ? 'Click again: interrupt all sessions and pause' : 'Stop everything'}</button>
+      <p class="foot"><button class="link" data-a="repo">${icon('code')}Source code (MIT)</button>${s ? ` · hub ${esc(s.hubVersion)}` : ''}</p>
     </main>`;
 }
 
