@@ -38,6 +38,7 @@ You can also call Claude yourself at any time ("Hey Siri, call CallMeClaude"). A
 - **Speaks your language**: pick the conversation language in the app or with `cmc setup --language` (`en-US`, `tr-TR`, `de-DE`, `es-ES`, …). Claude speaks it on calls and writes session summaries in it. You can also say "from now on speak German". The app and CLI themselves are in English.
 - **Unblocks sessions remotely**. It holds a stopped session open and continues it with your spoken instruction (`Stop` hook `decision: block`). It can also answer permission prompts, type into tmux sessions, resume ended sessions, queue the instruction for a busy session's next step, or continue an idle IDE/desktop session in a headless fork of its conversation.
 - **Uses the computer for you** when an agent can't, with Claude in Chrome, [Peekaboo](https://github.com/steipete/Peekaboo) and `cliclick`. On Linux it uses Claude in Chrome plus the screenshot and input tools of your desktop (see [what works where](#what-works-where)). It always asks for explicit voice confirmation first.
+- **Desktop tray app** for macOS and Linux (dmg, AppImage, deb): sessions, approvals and modes in the menu bar or system tray, a green icon while Claude calls, and voice calls with Claude on the computer itself. Choose where Claude calls you: **this computer**, **your phone**, or **nowhere**. With "this computer" you don't need a phone at all.
 - **Built for unattended days away**: a launchd service (systemd `--user` on Linux), sleep-prevention checks, Tailscale for cellular access, calls that survive reconnects, a panic switch and a full audit log.
 
 ## How it works
@@ -75,6 +76,7 @@ Everything else is bring-your-own-key and talks directly to the vendor: a **Gemi
 |---|---|
 | Hub (the computer that stays at home) | **macOS** 15+ · **Linux**: Ubuntu 22.04+, Debian 12+, Fedora, Linux Mint 21+, Arch; X11 and Wayland; GNOME, KDE and wlroots-based desktops (Sway, Hyprland) |
 | Phone | **iPhone** (iOS 17+, [apps/ios](apps/ios/README.md)) · **Android** 10+ ([apps/android](apps/android/README.md)) |
+| Desktop tray app | **macOS** (dmg) · **Linux** (AppImage, deb) ([apps/desktop](apps/desktop/README.md)). A Windows installer is built too, but the hub does not run on Windows yet |
 
 Any phone works with any hub: the Android app also works with a macOS hub, and the iPhone app with a Linux hub.
 
@@ -157,7 +159,15 @@ cmc panic                                     # interrupt everything and pause a
 cmc doctor                                    # check the whole setup
 ```
 
-On the phone, tap **Call Claude**, or say *"Hey Siri, call CallMeClaude"*.
+On the phone, tap **Call Claude**, or say *"Hey Siri, call CallMeClaude"*. On the computer, click the tray icon and press **Talk to Claude**.
+
+The tray icon also picks where Claude calls you when a session needs you:
+
+| Choice | What happens |
+|---|---|
+| **Call this computer** | The tray app rings (green icon, notification) and you talk through the computer's microphone. In Desk mode this still rings here. If the tray app is closed, the phone rings instead |
+| **Call my phone** | The phone rings as usual |
+| **Don't call** | Nothing rings; updates wait for the next conversation you start |
 
 ## Safety
 
@@ -189,6 +199,7 @@ Details and workarounds: [INSTALLATION.md › Honest limits](INSTALLATION.md#hon
 apps/mac-agent/     Hub: hook server, session state, classifier, calls, voice bridge, CLI
 apps/ios/           iPhone app (XcodeGen project)
 apps/android/       Android app (Gradle project)
+apps/desktop/       Tray app for macOS and Linux (Electron)
 packages/protocol/  Hub ↔ app message types
 scripts/            install helpers
 docs/               design docs, research and ADRs (in Turkish)

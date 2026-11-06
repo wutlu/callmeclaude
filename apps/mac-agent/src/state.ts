@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import type { PendingCard, SessionCard, SessionState, Snapshot, Risk } from '@callmeclaude/protocol';
+import type { CallInfo, PendingCard, RingTarget, SessionCard, SessionState, Snapshot, Risk } from '@callmeclaude/protocol';
 import { STATE_PATH, writeAtomic, type Mode } from './config.ts';
 import { log } from './util.ts';
 
@@ -82,6 +82,9 @@ export class State extends EventEmitter {
   mode: Mode;
   language = 'en-US';
   paused = false;
+  ringTarget: RingTarget = 'phone';
+  /** The call ringing or in progress (set by Calls / VoiceManager). */
+  call?: CallInfo;
   private saveTimer?: NodeJS.Timeout;
 
   constructor(mode: Mode) {
@@ -225,6 +228,8 @@ export class State extends EventEmitter {
       mode: this.mode,
       language: this.language,
       paused: this.paused,
+      ringTarget: this.ringTarget,
+      ...(this.call ? { call: this.call } : {}),
       hubVersion: HUB_VERSION,
       sessions: this.activeSessions().map(toCard(this)),
       pending: this.openPending().map(

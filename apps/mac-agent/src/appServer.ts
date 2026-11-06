@@ -2,7 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timingSafeEqual } from 'node:crypto';
-import type { AppToHub, HubToApp } from '@callmeclaude/protocol';
+import type { AppToHub, ClientKind, HubToApp, RingTarget } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
 import { DATA_DIR, LOG_DIR, saveConfig, writeAtomic, type Mode } from './config.ts';
 import type { Hub } from './hub.ts';
@@ -21,6 +21,8 @@ interface Client {
   id: string;
   ws: WebSocket;
   device: string;
+  /** Phone app or the desktop tray app. */
+  kind: ClientKind;
   callId?: string;
   /** Last lock state the phone reported; while locked the voice agent may not change anything. */
   locked?: boolean;
@@ -63,11 +65,18 @@ export class AppServer {
       .sort((a, b) => b.lastSeen.localeCompare(a.lastSeen))[0]?.voipToken;
   }
 
-  /** Returns true if at least one authenticated phone received it. */
-  broadcast(msg: HubToApp): boolean {
+  /** Is an app of this kind connected right now? */
+  has(kind: ClientKind): boolean {
+    for (const c of this.clients) if (c.kind === kind && c.ws.readyState === WebSocket.OPEN) return true;
+    return false;
+  }
+
+  /** Returns true if at least one authenticated app (of `kind`, if given) received it. */
+  broadcast(msg: HubToApp, kind?: ClientKind): boolean {
     const data = JSON.stringify(msg);
     let n = 0;
     for (const c of this.clients) {
+      if (kind && c.kind !== kind) continue;
       if (c.ws.readyState === WebSocket.OPEN) {
         c.ws.send(data);
         n++;
@@ -103,13 +112,14 @@ export class AppServer {
           return ws.close(4003, 'bad token');
         }
         clearTimeout(authTimer);
-        client = { id: shortId('ws_'), ws, device: msg.device || 'phone' };
+        client = { id: shortId('ws_'), ws, device: msg.device || 'phone', kind: msg.kind === 'desktop' ? 'desktop' : 'phone' };
         this.clients.add(client);
         this.touch(client.device);
-        audit('app.connect', { addr, device: client.device });
+        audit('app.connect', { addr, device: client.device, client: client.kind });
         send({ type: 'hello', v: PROTOCOL_VERSION, snapshot: this.hub.st.snapshot(), ...(this.urls.length ? { urls: this.urls } : {}) });
         // A call may be ringing while the app just woke up from the push.
-        if (this.hub.calls.ringing) send({ type: 'call.incoming', callId: this.hub.calls.ringing.callId, title: 'Claude' });
+        const r = this.hub.calls.ringing;
+        if (r && r.on === client.kind) send({ type: 'call.incoming', callId: r.callId, title: 'Claude' });
         return;
       }
       this.touch(client.device);
@@ -161,6 +171,7 @@ export class AppServer {
         const resumed = this.hub.voice.active?.callId === callId;
         await this.hub.voice.start(callId, msg.direction, {
           id: c.id,
+          kind: c.kind,
           audio: (pcm) => c.ws.readyState === WebSocket.OPEN && c.ws.send(pcm, { binary: true }),
           json: (m) => send(m),
           locked: () => c.locked === true,
@@ -197,6 +208,9 @@ export class AppServer {
           this.hub.st.changed();
           audit('language', { language: msg.language, via: 'app' });
         }
+        return;
+      case 'ring.set':
+        if ((['computer', 'phone', 'off'] as RingTarget[]).includes(msg.target)) this.hub.setRingTarget(msg.target);
         return;
       case 'panic':
         return this.hub.controller.panic('app');

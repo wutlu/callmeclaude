@@ -40,7 +40,7 @@ const hook = (event: string, body: object, headers: Record<string, string> = {})
     body: JSON.stringify(body),
   }).then((r) => r.json());
 
-function phone(): Promise<{ ws: WebSocket; msgs: any[]; next: (type: string) => Promise<any> }> {
+function phone(kind?: 'desktop'): Promise<{ ws: WebSocket; msgs: any[]; next: (type: string) => Promise<any> }> {
   return new Promise((resolve) => {
     const ws = new WebSocket(`ws://127.0.0.1:${APP}`);
     const msgs: any[] = [];
@@ -53,7 +53,7 @@ function phone(): Promise<{ ws: WebSocket; msgs: any[]; next: (type: string) => 
       if (i >= 0) waiters.splice(i, 1)[0][1](m);
     });
     ws.on('open', () => {
-      ws.send(JSON.stringify({ type: 'auth', token: 'apptok', device: 'test-phone', v: 1 }));
+      ws.send(JSON.stringify({ type: 'auth', token: 'apptok', device: kind ? 'test-desktop' : 'test-phone', v: 1, ...(kind ? { kind } : {}) }));
       resolve({
         ws,
         msgs,
@@ -272,4 +272,53 @@ test('call survives a phone reconnect: same callId re-attaches, late close of ol
   } finally {
     VoiceCall.prototype.start = realStart;
   }
+});
+
+test('ring target: the desktop app rings instead of the phone, falls back to the phone, or nobody rings', async () => {
+  const mode = hub.cfg.mode;
+  hub.cfg.mode = 'away';
+  const p = await phone();
+  const d = await phone('desktop');
+  await p.next('hello');
+  await d.next('hello');
+  const incoming = (c: { msgs: any[] }) => c.msgs.filter((m) => m.type === 'call.incoming').length;
+
+  // Computer: only the desktop app rings, and the snapshot shows it (the tray turns green).
+  d.ws.send(JSON.stringify({ type: 'ring.set', target: 'computer' }));
+  await new Promise((r) => setTimeout(r, 50));
+  assert.equal(hub.cfg.ringTarget, 'computer');
+  let r = await hub.calls.ring([{ priority: 'P1', title: 'a', text: 'a' }], 1);
+  assert.equal(r.viaSocket, true);
+  await d.next('call.incoming');
+  assert.equal(incoming(p), 0);
+  assert.deepEqual(hub.st.snapshot().call, { callId: r.callId, state: 'ringing', on: 'desktop', title: 'a' });
+  hub.calls.takeAgenda();
+  // Desk mode means "don't call my phone": with the desktop app as the target it still rings here.
+  hub.cfg.mode = 'desk';
+  assert.equal(hub.deskQuiet(), false);
+  assert.equal(hub.calls.allowed('P1'), true);
+  assert.equal(hub.st.snapshot().call, undefined);
+
+  // Computer, but the desktop app is closed: the phone rings rather than nobody.
+  d.ws.close();
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(hub.deskQuiet(), true);
+  hub.cfg.mode = 'away';
+  r = await hub.calls.ring([{ priority: 'P1', title: 'b', text: 'b' }], 1);
+  await p.next('call.incoming');
+  assert.equal(hub.st.snapshot().call.on, 'phone');
+  hub.calls.takeAgenda();
+
+  // Off: nothing rings; the update waits for the next conversation, and rings once calls are back on.
+  hub.setRingTarget('off');
+  hub.calls.enqueue({ priority: 'P1', title: 'c', text: 'c', requested: true });
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(hub.calls.ringing, undefined);
+  assert.equal(incoming(p), 1);
+  hub.setRingTarget('phone');
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(incoming(p), 2);
+  assert.equal(hub.calls.takeAgenda()[0].title, 'c');
+  p.ws.close();
+  hub.cfg.mode = mode;
 });

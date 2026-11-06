@@ -19,6 +19,8 @@ export interface CallSink {
   id: string;
   audio(pcm24k: Buffer): void;
   json(msg: HubToApp): void;
+  /** Which app carries the call (absent = phone). */
+  kind?: 'phone' | 'desktop';
   /** True while the phone is on its lock screen: no actions that change anything. */
   locked?(): boolean;
 }

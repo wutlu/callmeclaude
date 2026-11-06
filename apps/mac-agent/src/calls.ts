@@ -1,4 +1,4 @@
-import type { Priority, PushPayload } from '@callmeclaude/protocol';
+import type { ClientKind, Priority, PushPayload } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
 import { apnsConfigured, sendVoipPush } from './apns.ts';
 import type { Hub } from './hub.ts';
@@ -19,6 +19,8 @@ interface Ringing {
   items: CallItem[];
   attempts: number;
   timer: NodeJS.Timeout;
+  /** Which app is ringing. */
+  on: ClientKind;
 }
 
 const RANK: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
@@ -42,7 +44,7 @@ export class Calls {
     const m = this.hub.cfg.mode;
     if (p === 'P0') return true;
     if (p === 'P3') return false;
-    return m === 'away' || m === 'ride';
+    return m === 'away' || m === 'ride' || (m === 'desk' && !this.hub.deskQuiet());
   }
 
   enqueue(item: CallItem) {
@@ -53,6 +55,11 @@ export class Calls {
       return;
     }
     if (!item.requested && !this.allowed(item.priority)) return;
+    // "Don't call": keep it for the next conversation the developer starts.
+    if (this.hub.cfg.ringTarget === 'off') {
+      this.queue.push(item);
+      return;
+    }
     if (this.ringing) {
       this.ringing.items.push(item);
       return;
@@ -60,6 +67,11 @@ export class Calls {
     this.queue.push(item);
     const delay = item.priority === 'P0' ? 0 : this.hub.cfg.calls.batchSeconds[item.priority as 'P1' | 'P2'] * 1000;
     this.schedule(delay);
+  }
+
+  /** Ring for what is queued now (the developer turned calls back on). */
+  kick() {
+    if (this.queue.length && this.hub.cfg.ringTarget !== 'off') this.schedule(0);
   }
 
   private schedule(delayMs: number) {
@@ -72,7 +84,7 @@ export class Calls {
 
   private flush() {
     this.flushTimer = undefined;
-    if (!this.queue.length || this.hub.voice.active || this.ringing) return;
+    if (!this.queue.length || this.hub.voice.active || this.ringing || this.hub.cfg.ringTarget === 'off') return;
     // Drop items whose pending was resolved meanwhile (e.g. answered at the keyboard).
     this.queue = this.queue.filter((i) => !i.pendingId || this.hub.st.pending.get(i.pendingId)?.status === 'open');
     if (!this.queue.length) return;
@@ -84,25 +96,36 @@ export class Calls {
     void this.ring(items, 1);
   }
 
-  /** Ring the phone now (also used by `cmc call-me`). */
+  /** Where to ring now: the configured target; the phone if the desktop app is not running. */
+  target(): ClientKind {
+    if (this.hub.cfg.ringTarget === 'computer') {
+      if (this.hub.app.has('desktop')) return 'desktop';
+      log.warn('calls go to this computer, but the desktop app is not running: ringing the phone');
+    }
+    return 'phone';
+  }
+
+  /** Ring now (also used by `cmc call-me`): the desktop app or the phone, per ringTarget. */
   async ring(items: CallItem[], attempt: number) {
     const callId = shortId('c_');
     const title = items.length === 1 ? items[0].title : `${items.length} updates`;
+    const on = this.target();
     this.lastRingAt = Date.now();
     const timer = setTimeout(() => this.missed(callId), 50_000);
-    this.ringing = { callId, items, attempts: attempt, timer };
-    audit('call.ring', { callId, title, attempt, items: items.length });
+    this.ringing = { callId, items, attempts: attempt, timer, on };
+    this.setCall({ callId, state: 'ringing', on, title });
+    audit('call.ring', { callId, title, attempt, items: items.length, on });
 
-    const viaSocket = this.hub.app.broadcast({ type: 'call.incoming', callId, title });
+    const viaSocket = this.hub.app.broadcast({ type: 'call.incoming', callId, title }, on);
     let viaPush = false;
     const token = this.hub.app.voipToken();
-    if (token && apnsConfigured(this.hub.cfg)) {
+    if (on === 'phone' && token && apnsConfigured(this.hub.cfg)) {
       const payload: PushPayload = { cmc: { v: PROTOCOL_VERSION, callId, title, priority: items[0].priority } };
       const r = await sendVoipPush(this.hub.cfg, token, payload);
       viaPush = r.ok;
       if (!r.ok) log.warn('voip push failed', r.status, r.reason);
     }
-    if (!viaSocket && !viaPush) log.warn('could not reach phone: no socket and no push (pair the app / configure APNs)');
+    if (!viaSocket && !viaPush) log.warn(`could not reach the ${on}: no socket${on === 'phone' ? ' and no push (pair the app / configure APNs)' : ''}`);
     return { callId, viaSocket, viaPush };
   }
 
@@ -110,6 +133,7 @@ export class Calls {
     const r = this.ringing;
     if (!r || r.callId !== callId) return;
     this.ringing = undefined;
+    this.setCall(undefined, callId);
     audit('call.missed', { callId, attempt: r.attempts });
     const retry = r.items.filter((i) => RANK[i.priority] <= 1);
     if (retry.length && r.attempts <= this.hub.cfg.calls.maxRetries) {
@@ -130,12 +154,20 @@ export class Calls {
     if (this.ringing && (!callId || this.ringing.callId === callId)) {
       clearTimeout(this.ringing.timer);
       items.push(...this.ringing.items);
+      this.setCall(undefined, this.ringing.callId);
       this.ringing = undefined;
     }
     items.push(...this.queue.splice(0));
     clearTimeout(this.flushTimer);
     this.flushTimer = undefined;
     return items.filter((i) => !i.pendingId || this.hub.st.pending.get(i.pendingId)?.status === 'open');
+  }
+
+  /** Show (or clear) the ringing call in the snapshot. Clearing only touches the call it names. */
+  private setCall(info: typeof this.hub.st.call, clearId?: string) {
+    if (!info && this.hub.st.call?.callId !== clearId) return;
+    this.hub.st.call = info;
+    this.hub.st.changed();
   }
 
   declined(callId: string) {

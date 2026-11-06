@@ -1,0 +1,58 @@
+name: desktop-release
+# Builds the tray app installers. A `desktop-v*` tag attaches them to a GitHub release;
+# a manual run keeps them as workflow artifacts.
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: --mac
+          - os: ubuntu-latest
+            target: --linux
+          - os: windows-latest
+            target: --win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @callmeclaude/desktop build
+      - name: Package
+        working-directory: apps/desktop
+        shell: bash
+        run: npx electron-builder ${{ matrix.target }} --publish never
+        env:
+          # Unsigned unless signing secrets are configured (macOS falls back to an ad-hoc signature).
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: callmeclaude-desktop-${{ runner.os }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+            apps/desktop/release/*.exe
+          if-no-files-found: error
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd apps/desktop/release
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "CallMeClaude desktop ${GITHUB_REF_NAME#desktop-v}" --notes "Tray app for macOS and Linux. The Windows build is a client only: the hub does not run on Windows yet." || true
+          gh release upload "$GITHUB_REF_NAME" $(ls *.dmg *.AppImage *.deb *.exe 2>/dev/null) --clobber

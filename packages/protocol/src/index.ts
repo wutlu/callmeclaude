@@ -20,6 +20,19 @@ export type SessionState =
 export type Mode = 'desk' | 'away' | 'ride' | 'sleep';
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3';
 export type Risk = 'low' | 'medium' | 'high' | 'critical';
+/** Where the hub rings: the desktop app on this computer, the phone, or nowhere (updates wait for the next conversation). */
+export type RingTarget = 'computer' | 'phone' | 'off';
+/** Which kind of app is connected. Absent in auth = phone (older apps). */
+export type ClientKind = 'phone' | 'desktop';
+
+/** The call right now, so every app can show it (the desktop tray turns green while the phone talks). */
+export interface CallInfo {
+  callId: string;
+  state: 'ringing' | 'active';
+  /** Where it rings / where it is being talked on. */
+  on: ClientKind;
+  title: string;
+}
 
 export interface SessionCard {
   id: string;
@@ -51,6 +64,8 @@ export interface Snapshot {
   pending: PendingCard[];
   hubVersion: string;
   paused: boolean;
+  ringTarget?: RingTarget;
+  call?: CallInfo;
 }
 
 export type HubToApp =
@@ -66,11 +81,12 @@ export type HubToApp =
   | { type: 'error'; message: string };
 
 export type AppToHub =
-  | { type: 'auth'; token: string; device: string; v: number }
+  | { type: 'auth'; token: string; device: string; v: number; kind?: ClientKind }
   | { type: 'call.start'; callId?: string; direction: 'inbound' | 'outbound' }
   | { type: 'call.end'; callId: string }
   | { type: 'mode.set'; mode: Mode }
   | { type: 'language.set'; language: string }
+  | { type: 'ring.set'; target: RingTarget }
   | { type: 'panic' }
   | { type: 'resume' }
   | { type: 'push.register'; token: string; kind: 'voip' }

@@ -12,6 +12,7 @@ export const LOG_DIR = join(DATA_DIR, 'logs');
 export const BRAIN_DIR = join(DATA_DIR, 'brain');
 
 export type Mode = 'desk' | 'away' | 'ride' | 'sleep';
+export type RingTarget = 'computer' | 'phone' | 'off';
 /** Where voice-started Claude Code sessions run: a detached tmux session, or a background `claude -p`. */
 export type VoiceSessions = 'tmux' | 'headless';
 
@@ -23,6 +24,8 @@ export interface Config {
   /** Token the phone app must present. Rotated by `cmc pair --rotate`. */
   appToken: string;
   mode: Mode;
+  /** Where calls ring: the desktop app, the phone, or nowhere. */
+  ringTarget: RingTarget;
   /** BCP-47 code of the language the voice agent speaks and summaries are written in (e.g. en-US, tr-TR). */
   language: string;
   voice: {
@@ -74,6 +77,7 @@ export function defaultConfig(): Config {
     hookToken: randomBytes(24).toString('hex'),
     appToken: randomBytes(24).toString('base64url'),
     mode: 'away',
+    ringTarget: 'phone',
     language: 'en-US',
     voice: { provider: 'gemini-live', model: 'gemini-3.8-live', voiceName: 'Puck' },
     claude: {

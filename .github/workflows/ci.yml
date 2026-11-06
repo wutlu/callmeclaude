@@ -66,3 +66,25 @@ jobs:
             apps/android/gradle/libs.versions.toml
             apps/android/gradle/wrapper/gradle-wrapper.properties
       - run: ./gradlew assembleDebug test --console=plain
+
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @callmeclaude/desktop typecheck
+      - run: pnpm --filter @callmeclaude/desktop test
+      - run: pnpm --filter @callmeclaude/desktop build
+      - name: Smoke test (render the panel without a hub, under Xvfb)
+        working-directory: apps/desktop
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0 libnss3 libasound2t64 libgbm1
+          export CMC_HOME="$RUNNER_TEMP/cmc" CMC_DESKTOP_SNAPSHOT="$RUNNER_TEMP/panel.png"
+          xvfb-run -a npx electron . --no-sandbox --hidden 2>&1 | tee "$RUNNER_TEMP/smoke.log"
+          grep -q 'tray=5 link=setup' "$RUNNER_TEMP/smoke.log"
+          test -s "$CMC_DESKTOP_SNAPSHOT"

@@ -1,3 +1,7 @@
 packages:
   - apps/mac-agent
+  - apps/desktop
   - packages/*
+
+onlyBuiltDependencies:
+  - esbuild

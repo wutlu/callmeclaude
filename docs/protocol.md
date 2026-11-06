@@ -10,11 +10,12 @@
 ## App → Hub
 | type | alanlar | |
 |---|---|---|
-| `auth` | `token`, `device`, `v` | Eşleştirmedeki token |
+| `auth` | `token`, `device`, `v`, `kind?` | Eşleştirmedeki token. `kind`: `phone` (varsayılan) · `desktop` (tepsi uygulaması) |
 | `push.register` | `token`, `kind:"voip"` | PushKit token |
 | `call.start` | `direction`, `callId?` | `outbound` = Hub'ın aramasını cevapladım; `inbound` = ben arıyorum |
 | `call.end` | `callId` | Kapat / reddet |
 | `mode.set` | `mode` | desk · away · ride · sleep |
+| `ring.set` | `target` | Arama nereye: `computer` (masaüstü uygulaması; açık değilse telefon) · `phone` · `off` (aranmaz, güncellemeler bir sonraki konuşmada) |
 | `pending.resolve` | `pendingId`, `decision`, `note?` | Ekrandan onay/ret/bırak |
 | `device.lock` | `locked` | Kilit ekranı açık mı; bağlanınca ve her değişimde. Kilitliyken sesli asistan yalnızca sorulara cevap verir, değişiklik yapamaz |
 | `panic` / `resume` / `ping` | | |
@@ -23,9 +24,9 @@
 | type | alanlar | |
 |---|---|---|
 | `hello` | `v`, `snapshot` | Auth başarılı |
-| `snapshot` | `snapshot` | Oturum/karar listesi değişti |
+| `snapshot` | `snapshot` | Oturum/karar listesi değişti. `ringTarget` ve çalan/süren arama (`call: {callId, state, on, title}`) da burada |
 | `heartbeat` | `ts` | 15 sn'de bir |
-| `call.incoming` | `callId`, `title` | Uygulama açıksa (push'a ek olarak) |
+| `call.incoming` | `callId`, `title` | Yalnızca çalan tarafa (`ringTarget`'a göre masaüstü ya da telefon); telefonda push'a ek olarak |
 | `call.ready` / `call.ended` | `callId`, `reason?` | |
 | `audio.flush` | | Kullanıcı araya girdi, kuyruktaki sesi at |
 | `transcript` | `role`, `text`, `final` | Altyazı |

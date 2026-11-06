@@ -44,3 +44,4 @@ credentials/
 .vscode/
 .idea/
 .claude/
+apps/desktop/release/

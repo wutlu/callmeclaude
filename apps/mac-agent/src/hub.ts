@@ -1,6 +1,6 @@
 import { AppServer } from './appServer.ts';
 import { Calls } from './calls.ts';
-import { loadConfig, saveConfig, type Config, type Mode } from './config.ts';
+import { loadConfig, saveConfig, type Config, type Mode, type RingTarget } from './config.ts';
 import { Controller } from './controller.ts';
 import { startHookServer } from './hookServer.ts';
 import { HUB_VERSION, State } from './state.ts';
@@ -15,6 +15,10 @@ class VoiceManager {
     // Same call again (phone reconnected / duplicate start): re-attach, do not restart the conversation.
     if (this.active && this.active.callId === callId) {
       this.active.attach(sink);
+      if (this.hub.st.call?.callId === callId && sink.kind && this.hub.st.call.on !== sink.kind) {
+        this.hub.st.call = { ...this.hub.st.call, on: sink.kind };
+        this.hub.st.changed();
+      }
       sink.json({ type: 'call.ready', callId });
       return;
     }
@@ -22,14 +26,22 @@ class VoiceManager {
     const agenda = this.hub.calls.takeAgenda(direction === 'outbound' ? callId : undefined);
     const call = new VoiceCall(this.hub, callId, agenda.length ? 'outbound' : direction, agenda, sink, (reason) => {
       if (this.active === call) this.active = undefined;
+      if (this.hub.st.call?.callId === callId) {
+        this.hub.st.call = undefined;
+        this.hub.st.changed();
+      }
       log.info('call ended', callId, reason);
     });
     this.active = call;
+    this.hub.st.call = { callId, state: 'active', on: sink.kind ?? 'phone', title: 'Claude' };
+    this.hub.st.changed();
     audit('call.start', { callId, direction, agenda: agenda.length });
     try {
       await call.start();
     } catch (e) {
       this.active = undefined;
+      if (this.hub.st.call?.callId === callId) this.hub.st.call = undefined;
+      this.hub.st.changed();
       sink.json({ type: 'error', message: (e as Error).message });
       sink.json({ type: 'call.ended', callId, reason: 'voice-error' });
       throw e;
@@ -49,6 +61,7 @@ export class Hub {
     this.cfg = loadConfig();
     this.st = new State(this.cfg.mode);
     this.st.language = this.cfg.language;
+    this.st.ringTarget = this.cfg.ringTarget;
     this.controller = new Controller(this.st, this.cfg);
     this.calls = new Calls(this);
     this.voice = new VoiceManager(this);
@@ -75,6 +88,23 @@ export class Hub {
     this.st.mode = m;
     saveConfig(this.cfg);
     this.st.changed();
+  }
+
+  /**
+   * Desk mode = "I'm at the computer, don't call my phone". With calls going to this computer and the
+   * desktop app running, the computer still rings; otherwise desk mode stays quiet.
+   */
+  deskQuiet(): boolean {
+    return this.cfg.mode === 'desk' && !(this.cfg.ringTarget === 'computer' && this.app.has('desktop'));
+  }
+
+  setRingTarget(t: RingTarget) {
+    this.cfg.ringTarget = t;
+    this.st.ringTarget = t;
+    saveConfig(this.cfg);
+    this.st.changed();
+    audit('ring.target', { target: t });
+    this.calls.kick();
   }
 
   /** Sessions that look stuck: a tool started long ago and nothing happened since. */

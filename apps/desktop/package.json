@@ -1,0 +1,93 @@
+{
+  "name": "@callmeclaude/desktop",
+  "productName": "CallMeClaude",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CallMeClaude in the system tray: sessions, approvals, and voice calls with Claude on this computer.",
+  "license": "MIT",
+  "author": "CallMeClaude contributors",
+  "homepage": "https://github.com/wutlu/callmeclaude",
+  "main": "dist/main.cjs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && electron .",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --import tsx --test test/*.test.ts",
+    "dist": "node scripts/build.mjs && electron-builder --publish never"
+  },
+  "devDependencies": {
+    "@callmeclaude/protocol": "workspace:*",
+    "@types/node": "^26.6.6",
+    "electron": "44.9.0",
+    "electron-builder": "26.17.0",
+    "esbuild": "0.28.2",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0"
+  },
+  "build": {
+    "appId": "dev.callmeclaude.desktop",
+    "productName": "CallMeClaude",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "npmRebuild": false,
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "extendInfo": {
+        "LSUIElement": true,
+        "NSMicrophoneUsageDescription": "CallMeClaude uses the microphone when you talk to Claude on this computer."
+      },
+      "identity": "-",
+      "hardenedRuntime": false
+    },
+    "dmg": {
+      "title": "CallMeClaude"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Development",
+      "icon": "build/icon.png",
+      "synopsis": "Claude Code sessions in your tray; talk to Claude by voice.",
+      "maintainer": "CallMeClaude contributors <noreply@github.com>"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "artifactName": "CallMeClaude-${version}-${os}-${arch}.${ext}"
+  }
+}

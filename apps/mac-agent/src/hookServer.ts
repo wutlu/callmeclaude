@@ -189,7 +189,7 @@ async function onStop(hub: Hub, input: Json, base: Partial<Session>, send: (b: o
   const wanted = !st.paused && st.consumeCallback(s);
   if (wanted) audit('callback.due', { session: s.id, project: s.project });
 
-  if (!wanted && (st.paused || cfg.mode === 'desk' || cfg.mode === 'sleep')) {
+  if (!wanted && (st.paused || hub.deskQuiet() || cfg.mode === 'sleep')) {
     const c = quickClassify(lastMessage);
     Object.assign(s, { state: c.state, summary: c.summary });
     st.changed();
@@ -230,7 +230,7 @@ async function onPermission(hub: Hub, input: Json, base: Partial<Session>, send:
     return send({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision: { behavior: 'allow' } } });
   }
   // A session the developer asked to hear back from also rings for permissions, even in desk mode.
-  if (st.paused || (cfg.mode === 'desk' && !st.hasCallback(s))) return send({});
+  if (st.paused || (hub.deskQuiet() && !st.hasCallback(s))) return send({});
 
   const p = hold(hub, s, 'permission', `Asks for permission: ${desc}`, JSON.stringify(input.tool_input ?? {}).slice(0, 2000), riskOf(sig), send, res);
   p.toolName = input.tool_name;
