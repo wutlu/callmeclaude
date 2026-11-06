@@ -66,6 +66,13 @@ async function control(hub: Hub, cmd: string, body: Json): Promise<object> {
       const { computerTask } = await import('./brain.ts');
       return { result: await computerTask(hub, String(body.task ?? ''), body.project) };
     }
+    case 'tell': {
+      // Same delivery as the voice tool reply_to_session: hold → tmux → resume → queue / headless fork.
+      const s = hub.st.findSession(String(body.project ?? ''));
+      const text = String(body.text ?? '').trim();
+      if (!s || !text) return { error: s ? 'empty instruction' : 'session not found' };
+      return { project: s.project, via: await hub.controller.instruct(s, text) };
+    }
     case 'resume':
       hub.st.paused = false;
       hub.st.changed();

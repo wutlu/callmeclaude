@@ -157,6 +157,18 @@ test('instruction for an idle session nobody can type into runs in a headless fo
   assert.equal(hub.st.sessions.get(forkId).state, 'running');
 });
 
+test('cmc tell: the control API delivers an instruction to a session by project name', async () => {
+  await hook('PreToolUse', { session_id: 's_tell', cwd: '/x/shop', tool_name: 'Bash', tool_input: {} });
+  const ctl = (body: object) =>
+    fetch(`http://127.0.0.1:${HOOK}/control/tell`, { method: 'POST', headers: { authorization: 'Bearer hooktok', 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+  assert.deepEqual(await ctl({ project: 'shop', text: 'run the tests too' }), { project: 'shop', via: 'queue' });
+  assert.deepEqual(hub.st.queued.get('s_tell'), ['run the tests too']);
+  assert.deepEqual(await ctl({ project: 'nope', text: 'x' }), { error: 'session not found' });
+  assert.deepEqual(await ctl({ project: 'shop', text: '  ' }), { error: 'empty instruction' });
+  const noAuth = await fetch(`http://127.0.0.1:${HOOK}/control/tell`, { method: 'POST', body: '{}' });
+  assert.notEqual(noAuth.status, 200);
+});
+
 test('desk mode never holds', async () => {
   hub.cfg.mode = 'desk';
   const t = Date.now();

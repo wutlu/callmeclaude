@@ -67,6 +67,8 @@ export function helpText(os: NodeJS.Platform, secretStore: string, thisMachine: 
   run [dir] [task]     Start Claude Code inside tmux (so the hub can type into it)
   ignore [dir] [--remove|--list]
                        Watch-only: report status, never hold or call
+  tell <project> "<instruction>"
+                       Give a session an instruction, like answering it by phone
   do "<task>"          Let the hub do something on ${thisMachine} (browser/desktop)
   panic | resume       Interrupt everything / resume automation
   doctor               Check the installation

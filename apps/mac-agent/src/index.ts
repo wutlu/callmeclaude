@@ -206,6 +206,13 @@ async function main() {
       return console.log(r.result);
     }
 
+    case 'tell': {
+      const [project, ...words] = flags._;
+      if (!project || !words.length) return console.log('usage: cmc tell <project> "<instruction>"');
+      const r = await api('tell', { project, text: words.join(' ') });
+      return console.log(r.error ? `❌ ${r.error}` : `✅ ${r.project}: delivered via ${r.via}`);
+    }
+
     case 'mode': {
       const m = flags._[0] as Mode;
       if (!['desk', 'away', 'ride', 'sleep'].includes(m)) return console.log('usage: cmc mode desk|away|ride|sleep');
