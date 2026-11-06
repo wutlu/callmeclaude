@@ -35,6 +35,10 @@ export class VoiceCall {
   private speaking = false;
   private ended = false;
   private idleQueue: string[] = [];
+  /** The decision the developer was last asked about; later questions wait until it is answered. */
+  private asking?: string;
+  private questions: Array<{ text: string; pendingId: string }> = [];
+  private onState = () => this.nextQuestion();
   private lastActivity = Date.now();
   private silencePrompted = false;
   private watchdog?: NodeJS.Timeout;
@@ -68,6 +72,7 @@ export class VoiceCall {
     const lock = this.sink.locked?.() ? '\n\nTHE PHONE IS LOCKED: you can report status and answer questions, but anything that changes something needs the developer to unlock the phone first.' : '';
     this.send(`${opening}\n\nCURRENT STATE:\n${briefing(this.hub, this.agenda)}${lock}`);
     this.watchdog = setInterval(() => this.checkSilence(), 2000);
+    this.hub.st.on('changed', this.onState);
   }
 
   private async connect() {
@@ -139,10 +144,33 @@ export class VoiceCall {
     this.live.sendRealtimeInput({ audio: { data: pcm16k.toString('base64'), mimeType: 'audio/pcm;rate=16000' } });
   }
 
-  /** Tell the developer something mid-call. 'idle' waits until the assistant stops talking. */
-  inject(text: string, when: 'now' | 'idle') {
+  /**
+   * Tell the developer something mid-call. 'idle' waits until the assistant stops talking.
+   * A new decision (pendingId) waits until the previous one is answered: one question at a time.
+   */
+  inject(text: string, when: 'now' | 'idle', pendingId?: string) {
+    if (pendingId) {
+      if (this.isOpen(this.asking) && this.asking !== pendingId) {
+        if (!this.questions.some((q) => q.pendingId === pendingId)) this.questions.push({ text, pendingId });
+        return;
+      }
+      this.asking = pendingId;
+    }
     if (when === 'idle' && this.speaking) this.idleQueue.push(text);
     else this.send(`[SYSTEM] New update, relay it briefly at a good moment: ${text}`);
+  }
+
+  private isOpen(pendingId?: string) {
+    return !!pendingId && this.hub.st.pending.get(pendingId)?.status === 'open';
+  }
+
+  /** The last decision was answered (or went away): bring up the next one still open. */
+  private nextQuestion() {
+    if (this.ended || this.isOpen(this.asking)) return;
+    this.asking = undefined;
+    let q;
+    while ((q = this.questions.shift()) && !this.isOpen(q.pendingId));
+    if (q) this.inject(q.text, 'idle', q.pendingId);
   }
 
   private send(text: string) {
@@ -268,6 +296,7 @@ export class VoiceCall {
     if (this.ended) return;
     this.ended = true;
     clearInterval(this.watchdog);
+    this.hub.st.off('changed', this.onState);
     clearTimeout(this.detachTimer);
     const st = {
       ...this.stats,

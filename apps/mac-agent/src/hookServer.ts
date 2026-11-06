@@ -4,6 +4,7 @@ import { basename } from 'node:path';
 import { BRAIN_DIR } from './config.ts';
 import type { Hub } from './hub.ts';
 import { classify, quickClassify } from './classifier.ts';
+import { isReadOnly } from './readOnly.ts';
 import type { Pending, Session } from './state.ts';
 import { audit, clip, log, shortId } from './util.ts';
 import type { Risk } from '@callmeclaude/protocol';
@@ -229,8 +230,9 @@ async function onPermission(hub: Hub, input: Json, base: Partial<Session>, send:
 
   const rules = cfg.autoApprove[s.project] ?? [];
   const sig = toolSignature(input.tool_name, input.tool_input);
-  if (rules.some((r) => sig.startsWith(r))) {
-    audit('permission.auto', { session: s.id, project: s.project, sig });
+  const readOnly = cfg.autoApproveReadOnly !== false && isReadOnly(input.tool_name, input.tool_input);
+  if (readOnly || rules.some((r) => sig.startsWith(r))) {
+    audit('permission.auto', { session: s.id, project: s.project, tool: input.tool_name, why: readOnly ? 'read-only' : 'rule', desc });
     s.state = 'running';
     s.summary = 'Working.';
     st.changed();

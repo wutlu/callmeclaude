@@ -51,7 +51,7 @@ export class Calls {
     audit('call.enqueue', { ...item });
     // On a live call: just tell the developer now.
     if (this.hub.voice.active) {
-      this.hub.voice.active.inject(item.text, item.priority === 'P0' ? 'now' : 'idle');
+      this.hub.voice.active.inject(item.text, item.priority === 'P0' ? 'now' : 'idle', item.pendingId);
       return;
     }
     if (!item.requested && !this.allowed(item.priority)) return;

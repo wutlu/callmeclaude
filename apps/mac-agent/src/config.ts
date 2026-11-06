@@ -60,6 +60,8 @@ export interface Config {
   ignorePaths: string[];
   /** Per-project auto-approve rules: tool name prefixes, e.g. "Bash(npm test", "Edit". */
   autoApprove: Record<string, string[]>;
+  /** Approve requests that only read (files, git/CI status) without calling. Absent = on. */
+  autoApproveReadOnly?: boolean;
   /** Linux only, chosen by `cmc setup` (absent = tmux). Not in the defaults, so macOS configs never get this key. */
   voiceSessions?: VoiceSessions;
 }

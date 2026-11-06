@@ -122,6 +122,10 @@ test('permission request: auto-approve rule, then held + approved', async () => 
   hub.cfg.autoApprove['api'] = ['Bash(npm test'];
   const auto: any = await hook('PermissionRequest', { session_id: 's2', cwd: '/x/api', tool_name: 'Bash', tool_input: { command: 'npm test -- --watch=false' } });
   assert.equal(auto.hookSpecificOutput.decision.behavior, 'allow');
+  // Only looking (CI status, reading a file): approved without a call.
+  const look: any = await hook('PermissionRequest', { session_id: 's2', cwd: '/x/api', tool_name: 'Bash', tool_input: { command: 'gh run list -L 3' } });
+  assert.equal(look.hookSpecificOutput.decision.behavior, 'allow');
+  assert.equal(hub.st.openPending().length, 0);
 
   const held = hook('PermissionRequest', { session_id: 's2', cwd: '/x/api', tool_name: 'Bash', tool_input: { command: 'git push origin main' } });
   await new Promise((r) => setTimeout(r, 100));
@@ -333,4 +337,29 @@ test('ring target: the desktop app rings instead of the phone, falls back to the
   assert.equal(hub.calls.takeAgenda()[0].title, 'c');
   p.ws.close();
   hub.cfg.mode = mode;
+});
+
+test('on a call, a second decision waits until the first is answered', async () => {
+  const { VoiceCall } = await import('../src/voice/call.ts');
+  const sink = { id: 'x', audio() {}, json() {} };
+  const call: any = new VoiceCall(hub, 'c_q', 'outbound', [], sink, () => {});
+  const said: string[] = [];
+  call.send = (t: string) => said.push(t);
+  hub.st.on('changed', call.onState);
+  const mk = (id: string) => {
+    hub.st.pending.set(id, { id, sessionId: 's_q', project: 'api', kind: 'permission', summary: id, detail: '', risk: 'medium', createdAt: '', deadline: '', status: 'open' });
+  };
+  mk('p_q1');
+  mk('p_q2');
+  call.inject('first?', 'now', 'p_q1');
+  call.inject('second?', 'now', 'p_q2');
+  assert.equal(said.length, 1);
+  assert.match(said[0], /first\?/);
+  hub.st.pending.get('p_q1').status = 'resolved';
+  hub.st.changed();
+  assert.equal(said.length, 2);
+  assert.match(said[1], /second\?/);
+  hub.st.off('changed', call.onState);
+  hub.st.pending.delete('p_q1');
+  hub.st.pending.delete('p_q2');
 });
