@@ -33,6 +33,27 @@ export interface View {
   local?: { callId: string; state: 'ringing' | 'connecting' | 'active'; muted: boolean };
 }
 
+/** Settings that belong to this app on this computer (not the hub): userData/settings.json. */
+export interface DesktopSettings {
+  /** Pick up calls to this computer by itself after a few rings. */
+  autoAnswer: boolean;
+}
+
+export const DEFAULT_SETTINGS: DesktopSettings = { autoAnswer: false };
+
+/** How long a call rings here before it is answered automatically: time to hear it and decline. */
+export const AUTO_ANSWER_MS = 4000;
+
+/** The app's settings from settings.json text; anything missing or broken falls back to the defaults. */
+export function parseSettings(text: string | undefined): DesktopSettings {
+  try {
+    const c = text ? JSON.parse(text) : {};
+    return { autoAnswer: typeof c?.autoAnswer === 'boolean' ? c.autoAnswer : DEFAULT_SETTINGS.autoAnswer };
+  } catch {
+    return { ...DEFAULT_SETTINGS };
+  }
+}
+
 export type TrayTone = 'offline' | 'idle' | 'attention' | 'paused' | 'call';
 
 /** Icon color and tooltip. Green whenever a call rings or runs anywhere (phone or this computer). */

@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('cmc', {
   hide: () => ipcRenderer.send('hide'),
   openRepo: () => ipcRenderer.send('open-repo'),
   loginItem: (on?: boolean) => ipcRenderer.invoke('login-item', on),
+  autoAnswer: (on?: boolean) => ipcRenderer.invoke('auto-answer', on),
   micAccess: () => ipcRenderer.invoke('mic-access'),
   platform: () => ipcRenderer.invoke('platform'),
   onCommand: (cb: (c: unknown) => void) => {

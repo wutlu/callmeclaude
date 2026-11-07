@@ -11,6 +11,7 @@ A tray app for macOS and Linux. It connects to the hub on the same computer the 
 - **Click the icon** to open the panel: Talk to Claude, where calls go, approvals, mode, sessions, voice language, start at login, and Stop everything. Right-click (or the menu on Linux) has the same options.
 - **Where Claude calls you**: **Call this computer**, **Call my phone**, or **Don't call**.
   - With "this computer", the app rings and you answer with the computer's microphone, so no phone is needed.
+  - **Answer calls automatically** (Settings, or the tray menu) picks the call up after 4 seconds of ringing, hands-free. Decline still works while it rings. The choice is kept by the app on this computer.
   - Desk mode still rings here.
   - If the app is closed, the phone rings instead.
 - **Voice** runs through the hub's Gemini Live bridge, exactly like a phone call. The microphone is captured as 16 kHz PCM16 and the speaker plays 24 kHz PCM16.

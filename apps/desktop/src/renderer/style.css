@@ -186,3 +186,4 @@ select { font: inherit; background: var(--card-hi); color: var(--text); border: 
 .switch:checked { background: var(--green); border-color: transparent; }
 .switch:checked::after { transform: translateX(14px); }
 .foot { margin-top: 14px; text-align: center; color: var(--muted); font-size: 11px; }
+.autonote { font-size: 12px; margin-top: 4px; }

@@ -1,7 +1,7 @@
 // The panel: hub link, call handling, and the same controls as the phone app.
 import type { AppToHub, HubToApp, PendingCard, SessionCard, Snapshot } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
-import { DONE_ALERTS, LANGUAGES, MODES, RING_TARGETS, stateLabel, type HubConfig, type View } from '../shared.ts';
+import { AUTO_ANSWER_MS, DONE_ALERTS, LANGUAGES, MODES, RING_TARGETS, stateLabel, type HubConfig, type View } from '../shared.ts';
 import { CallAudio, Ringer } from './audio.ts';
 import { trayIcons } from './icons.ts';
 import { icon, stateIcon } from './ui-icons.ts';
@@ -14,6 +14,7 @@ interface Bridge {
   hide(): void;
   openRepo(): void;
   loginItem(on?: boolean): Promise<boolean>;
+  autoAnswer(on?: boolean): Promise<boolean>;
   micAccess(): Promise<boolean>;
   platform(): Promise<string>;
   onCommand(cb: (c: any) => void): void;
@@ -29,6 +30,10 @@ let callStarted = 0;
 let notice = '';
 let confirmPanic = false;
 let loginItem = false;
+/** Pick up calls to this computer after AUTO_ANSWER_MS of ringing (a setting of this app, kept by the main process). */
+let autoAnswer = false;
+let autoTimer: ReturnType<typeof setTimeout> | undefined;
+let autoAt = 0;
 let lastMessageAt = 0;
 let platform = '';
 /** Unsent replies to waiting sessions, by pending id (the panel re-renders on every hub update). */
@@ -106,6 +111,7 @@ function onMessage(m: HubToApp) {
       if (!local) {
         local = { callId: m.callId, state: 'ringing', muted: false };
         ringer.start();
+        armAutoAnswer();
       }
       break;
     case 'call.ready':
@@ -135,6 +141,27 @@ function onMessage(m: HubToApp) {
 }
 
 // ---------- calls ----------
+
+/** With "Answer calls automatically" on, a ringing call is picked up after a few rings (Decline still works). */
+function armAutoAnswer() {
+  clearTimeout(autoTimer);
+  autoTimer = undefined;
+  autoAt = 0;
+  if (!autoAnswer || local?.state !== 'ringing') return;
+  const id = local.callId;
+  autoAt = Date.now() + AUTO_ANSWER_MS;
+  autoTimer = setTimeout(() => {
+    autoTimer = undefined;
+    autoAt = 0;
+    if (local?.callId === id && local.state === 'ringing') void answer();
+  }, AUTO_ANSWER_MS);
+}
+
+function setAutoAnswer(on: boolean) {
+  autoAnswer = on;
+  armAutoAnswer();
+  update();
+}
 
 function newCallId() {
   return 'c_' + Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => (b % 36).toString(36)).join('');
@@ -214,6 +241,8 @@ cmc.onCommand((c) => {
       return hangup();
     case 'mute':
       return toggleMute();
+    case 'auto-answer':
+      return setAutoAnswer(!!c.on);
     case 'ring.set':
     case 'alert.set':
     case 'mode.set':
@@ -257,6 +286,7 @@ function callCard(): string {
       ${avatar('ring')}
       <h2>Claude is calling</h2>
       <p class="muted">${esc(snapshot?.call?.title ?? 'An update from your sessions')}</p>
+      ${autoAt ? `<p class="muted autonote" id="autoclock">${autoLabel()}</p>` : ''}
       <div class="keys">
         <button class="round red" data-a="decline" title="Decline">${icon('phoneOff')}</button>
         <button class="round green" data-a="answer" title="Answer">${icon('phone')}</button>
@@ -295,6 +325,10 @@ function callCard(): string {
     <h2>Talk to Claude</h2>
     <p class="muted">${on ? "Uses this computer's microphone" : 'Waiting for the hub…'}</p>
   </section>`;
+}
+
+function autoLabel() {
+  return `Answering by itself in ${Math.max(1, Math.ceil((autoAt - Date.now()) / 1000))} s`;
 }
 
 function offlineCard(): string {
@@ -428,6 +462,7 @@ function renderPanel() {
         <label class="row setting">${icon('globe')}<span class="grow">Voice language</span>
           <select data-a="language" ${online ? '' : 'disabled'}>${LANGUAGES.map(([c, n]) => `<option value="${c}" ${s?.language === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
         </label>
+        <label class="row setting" title="Calls to this computer are picked up after ${AUTO_ANSWER_MS / 1000} seconds of ringing. You can still decline.">${icon('phone')}<span class="grow">Answer calls automatically</span><input type="checkbox" class="switch" data-a="autoanswer" ${autoAnswer ? 'checked' : ''}></label>
         <label class="row setting">${icon('power')}<span class="grow">Start at login</span><input type="checkbox" class="switch" data-a="login" ${loginItem ? 'checked' : ''}></label>
       </section>
       <button class="btn danger wide" data-a="panic" ${online && !s?.paused ? '' : 'disabled'}>${icon('octagonX')}${confirmPanic ? 'Click again: interrupt all sessions and pause' : 'Stop everything'}</button>
@@ -484,6 +519,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('change', async (e) => {
   const el = e.target as HTMLInputElement | HTMLSelectElement;
   if (el.dataset.a === 'language') send({ type: 'language.set', language: el.value });
+  if (el.dataset.a === 'autoanswer') setAutoAnswer(await cmc.autoAnswer((el as HTMLInputElement).checked));
   if (el.dataset.a === 'login') {
     loginItem = await cmc.loginItem((el as HTMLInputElement).checked);
     render();
@@ -508,6 +544,8 @@ document.addEventListener('keydown', (e) => {
 setInterval(() => {
   const c = document.getElementById('clock');
   if (c && local?.state === 'active') c.textContent = clock(Date.now() - callStarted);
+  const a = document.getElementById('autoclock');
+  if (a && autoAt) a.textContent = autoLabel();
 }, 1000);
 setInterval(() => !local && render(), 30_000);
 
@@ -516,6 +554,7 @@ void (async () => {
   document.body.classList.add(`os-${platform}`);
   cmc.icons(trayIcons(platform));
   loginItem = await cmc.loginItem();
+  autoAnswer = await cmc.autoAnswer();
   update();
   void connect();
 })();

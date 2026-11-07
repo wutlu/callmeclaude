@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Snapshot } from '@callmeclaude/protocol';
-import { autostartEntry, floatToPcm16, hubDataDir, panelPosition, parseHubConfig, pcm16ToFloat, trayLook } from '../src/shared.ts';
+import { autostartEntry, floatToPcm16, hubDataDir, panelPosition, parseHubConfig, parseSettings, pcm16ToFloat, trayLook } from '../src/shared.ts';
 
 const snap = (over: Partial<Snapshot> = {}): Snapshot => ({
   mode: 'away',
@@ -68,4 +68,12 @@ test('PCM16 round trip clamps and keeps little-endian samples', () => {
   assert.equal(back.length, 5);
   assert.ok(Math.abs(back[1] - 1) < 1e-3 && back[2] === -1 && Math.abs(back[3] - 1) < 1e-3 && Math.abs(back[4] + 0.5) < 1e-3);
   assert.equal(pcm16ToFloat(new Uint8Array([1, 2, 3]).buffer).length, 1);
+});
+
+test('desktop settings: auto-answer is off unless saved as on, broken files fall back', () => {
+  assert.deepEqual(parseSettings(undefined), { autoAnswer: false });
+  assert.deepEqual(parseSettings('{"autoAnswer":true}'), { autoAnswer: true });
+  assert.deepEqual(parseSettings('{"autoAnswer":"yes"}'), { autoAnswer: false });
+  assert.deepEqual(parseSettings('null'), { autoAnswer: false });
+  assert.deepEqual(parseSettings('{not json'), { autoAnswer: false });
 });

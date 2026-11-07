@@ -4,7 +4,7 @@ import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, screen, s
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { autostartEntry, DONE_ALERTS, hubDataDir, MODES, panelPosition, parseHubConfig, RING_TARGETS, stateLabel, trayLook, type TrayTone, type View } from './shared.ts';
+import { autostartEntry, DONE_ALERTS, hubDataDir, MODES, panelPosition, parseHubConfig, parseSettings, RING_TARGETS, stateLabel, trayLook, type DesktopSettings, type TrayTone, type View } from './shared.ts';
 
 const SIZE = { width: 380, height: 620 };
 const isMac = process.platform === 'darwin';
@@ -18,6 +18,7 @@ let quitting = false;
 /** Tray images per tone, drawn by the renderer (canvas) once it loads. */
 const icons = new Map<TrayTone, NativeImage>();
 let lastRinging: string | undefined;
+let settings: DesktopSettings | undefined;
 
 // A screenshot run may happen next to the installed app, so it does not take the single-instance lock.
 if (!process.env.CMC_DESKTOP_SNAPSHOT && !app.requestSingleInstanceLock()) app.quit();
@@ -217,6 +218,7 @@ function buildMenu(): Menu {
   }
 
   items.push({ label: 'Open CallMeClaude', click: () => showWindow() });
+  items.push({ label: 'Answer calls automatically', type: 'checkbox', checked: getSettings().autoAnswer, click: (i) => setAutoAnswer(i.checked) });
   items.push({ label: 'Start at login', type: 'checkbox', checked: loginItem(), click: (i) => setLoginItem(i.checked) });
   items.push({ label: 'Source code (MIT)', click: () => void shell.openExternal(REPO) });
   items.push({ label: 'Quit', click: () => app.quit() });
@@ -280,6 +282,31 @@ function setLoginItem(on: boolean) {
   refreshTray();
 }
 
+function settingsPath() {
+  return join(app.getPath('userData'), 'settings.json');
+}
+
+function getSettings(): DesktopSettings {
+  if (!settings) {
+    const p = settingsPath();
+    settings = parseSettings(existsSync(p) ? readFileSync(p, 'utf8') : undefined);
+  }
+  return settings;
+}
+
+function setAutoAnswer(on: boolean) {
+  settings = { ...getSettings(), autoAnswer: on };
+  try {
+    mkdirSync(app.getPath('userData'), { recursive: true });
+    writeFileSync(settingsPath(), JSON.stringify(settings, null, 2) + '\n');
+  } catch (e) {
+    console.error(`could not save settings: ${(e as Error).message}`);
+  }
+  // The tray menu changed it: the panel shows the switch (and answers a call ringing right now).
+  command({ type: 'auto-answer', on });
+  refreshTray();
+}
+
 function ipc() {
   ipcMain.handle('hub-config', () => {
     const dir = hubDataDir(homedir(), process.env);
@@ -307,6 +334,10 @@ function ipc() {
   ipcMain.handle('login-item', (_e, on?: boolean) => {
     if (typeof on === 'boolean') setLoginItem(on);
     return loginItem();
+  });
+  ipcMain.handle('auto-answer', (e, on?: boolean) => {
+    if (e.sender === win?.webContents && typeof on === 'boolean') setAutoAnswer(on);
+    return getSettings().autoAnswer;
   });
   // macOS asks once for the microphone; elsewhere the permission handler above decides.
   ipcMain.handle('mic-access', async () => (isMac ? systemPreferences.askForMediaAccess('microphone') : true));
