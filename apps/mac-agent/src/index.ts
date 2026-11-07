@@ -8,7 +8,7 @@ import qrcode from 'qrcode-terminal';
 import QR from 'qrcode';
 import type { PairingInfo } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
-import { CONFIG_PATH, LOG_DIR, loadConfig, parseVoiceSessionsAnswer, planVoiceSessions, saveConfig, voiceSessionMode, type Mode, type VoiceSessions } from './config.ts';
+import { CONFIG_PATH, LOG_DIR, loadConfig, parseVoiceSessionsAnswer, planVoiceSessions, saveConfig, sessionPermissionMode, voiceSessionMode, type Mode, type VoiceSessions } from './config.ts';
 import { getSecret, setSecret } from './secrets.ts';
 import { hooksInstalled, installHooks, installService, restartService, uninstallHooks, uninstallService, SERVICE } from './install.ts';
 import { platform, SecretStoreError } from './platform/index.ts';
@@ -136,7 +136,9 @@ async function main() {
       saveConfig(cfg);
       if (!flags['no-hooks']) {
         installHooks(cfg);
+        saveConfig(cfg);
         console.log('✅ Claude Code hooks merged into ~/.claude/settings.json (backup saved).');
+        if (cfg.sessionPermissions !== 'keep') console.log('✅ Claude Code sessions run with full permission (bypassPermissions); critical actions still ask. Set "sessionPermissions": "keep" in config.json to turn this off.');
       }
       if (!flags['no-service']) {
         await installService();
@@ -237,7 +239,7 @@ async function main() {
       const dir = flags._[0] ?? process.cwd();
       const task = flags._.slice(1).join(' ');
       const name = 'cmc-' + dir.split('/').filter(Boolean).pop()!.replace(/[^a-zA-Z0-9]/g, '').slice(0, 20) + '-' + Date.now().toString(36).slice(-4);
-      const args = ['new-session', '-s', name, '-c', dir, 'claude', ...(task ? [task] : [])];
+      const args = ['new-session', '-s', name, '-c', dir, 'claude', '--permission-mode', sessionPermissionMode(loadConfig()), ...(task ? [task] : [])];
       if (!process.stdout.isTTY) args.splice(1, 0, '-d');
       spawnSync('tmux', args, { stdio: 'inherit' });
       return;
@@ -269,10 +271,13 @@ async function main() {
     case 'restart':
       return console.log((await restartAndWait()) ? 'Hub restarted.' : '❌ The hub did not start: cmc logs');
 
-    case 'uninstall':
-      uninstallHooks();
+    case 'uninstall': {
+      const cfg = loadConfig();
+      uninstallHooks(cfg);
+      saveConfig(cfg);
       await uninstallService();
       return console.log(`Hooks and service removed. Your data is still in ${CONFIG_PATH} (delete it manually if you like).`);
+    }
 
     case 'type-text':
       // Internal, Linux only: the computer task's agent types text with it (see platform/clipboard.ts).

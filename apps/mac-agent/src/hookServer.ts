@@ -123,7 +123,8 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
         openTool: event === 'PreToolUse' ? input.tool_name : undefined,
       });
       if (s.summary === 'Session opened.' || s.summary === 'New session started.') s.summary = 'Working.';
-      return send(event === 'PostToolUse' ? withQueued(hub, s, 'PostToolUse') : {});
+      if (event === 'PreToolUse') return send(watchOnly ? {} : criticalGuard(input));
+      return send(withQueued(hub, s, 'PostToolUse'));
     }
     case 'Notification': {
       const s = st.upsertSession(sid, input.cwd, base);
@@ -221,6 +222,19 @@ async function onStop(hub: Hub, input: Json, base: Partial<Session>, send: (b: o
     pendingId: p.id,
     requested: wanted,
   });
+}
+
+/**
+ * Sessions run with full permission (bypassPermissions), so Claude Code never asks on its own. A critical action
+ * (money, accounts, sending to people, wiping data) is turned back into a permission prompt here; the
+ * PermissionRequest hook then holds it and calls the developer like any critical request.
+ */
+export function criticalGuard(input: Json): object {
+  if (input.permission_mode === 'plan') return {};
+  const critical = criticalReason(input.tool_name, input.tool_input);
+  if (!critical) return {};
+  audit('permission.critical', { session: input.session_id, tool: input.tool_name, why: critical });
+  return { hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'ask', permissionDecisionReason: `CallMeClaude: ${critical}, the developer decides.` } };
 }
 
 async function onPermission(hub: Hub, input: Json, base: Partial<Session>, send: (b: object) => void, res: ServerResponse) {

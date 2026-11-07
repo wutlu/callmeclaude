@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultConfig, inProjectRoots, parseVoiceSessionsAnswer, planVoiceSessions, voiceSessionMode } from '../src/config.ts';
+import { defaultConfig, inProjectRoots, parseVoiceSessionsAnswer, planVoiceSessions, sessionPermissionMode, voiceSessionMode } from '../src/config.ts';
+import { applySessionPermissions } from '../src/install.ts';
 import { headlessStartArgs } from '../src/controller.ts';
 
 const plan = (os: NodeJS.Platform, flags: Record<string, unknown>, interactive = false, tmuxInstalled = true) =>
@@ -33,15 +34,47 @@ test('voice session mode: headless only on Linux with the opt-out; missing key =
   assert.equal(voiceSessionMode({ voiceSessions: 'headless' }, 'darwin'), 'tmux');
 });
 
-test('headless start argv: print mode, fixed session id, acceptEdits, task as the prompt', () => {
+test('headless start argv: print mode, fixed session id, full permission, task as the prompt', () => {
   assert.deepEqual(headlessStartArgs('11111111-2222-3333-4444-555555555555', 'fix the tests'), [
     '-p',
     '--session-id',
     '11111111-2222-3333-4444-555555555555',
     '--permission-mode',
-    'acceptEdits',
+    'bypassPermissions',
     'fix the tests',
   ]);
+  assert.equal(headlessStartArgs('id', 't', 'acceptEdits')[4], 'acceptEdits');
+});
+
+test('session permissions: bypass unless the config says keep', () => {
+  assert.equal(sessionPermissionMode({}), 'bypassPermissions');
+  assert.equal(sessionPermissionMode({ sessionPermissions: 'bypass' }), 'bypassPermissions');
+  assert.equal(sessionPermissionMode({ sessionPermissions: 'keep' }), 'acceptEdits');
+});
+
+test('setup makes bypassPermissions Claude Code\'s default mode; keep / uninstall put the old mode back', () => {
+  const cfg: any = {};
+  const settings: any = { permissions: { defaultMode: 'auto', allow: ['Bash(ls)'] } };
+  applySessionPermissions(settings, cfg);
+  assert.equal(settings.permissions.defaultMode, 'bypassPermissions');
+  assert.deepEqual(settings.permissions.allow, ['Bash(ls)']);
+  assert.equal(settings.skipDangerousModePermissionPrompt, true);
+  assert.equal(cfg.claudeDefaultModeBefore, 'auto');
+  // Running setup again does not forget the original mode.
+  applySessionPermissions(settings, cfg);
+  assert.equal(cfg.claudeDefaultModeBefore, 'auto');
+  cfg.sessionPermissions = 'keep';
+  applySessionPermissions(settings, cfg);
+  assert.equal(settings.permissions.defaultMode, 'auto');
+  assert.equal(cfg.claudeDefaultModeBefore, undefined);
+
+  const fresh: any = {};
+  const cfg2: any = {};
+  applySessionPermissions(fresh, cfg2);
+  assert.equal(cfg2.claudeDefaultModeBefore, null);
+  cfg2.sessionPermissions = 'keep';
+  applySessionPermissions(fresh, cfg2);
+  assert.equal(fresh.permissions, undefined);
 });
 
 test('project roots: the root itself and folders inside it, not look-alike siblings', () => {

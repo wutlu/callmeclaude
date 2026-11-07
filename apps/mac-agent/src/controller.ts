@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { inProjectRoots, voiceSessionMode, type Config } from './config.ts';
+import { inProjectRoots, sessionPermissionMode, voiceSessionMode, type Config, type PermissionMode } from './config.ts';
 import { norm, type Pending, type Session, type State } from './state.ts';
 import { audit, execFileP, log } from './util.ts';
 
@@ -11,8 +11,8 @@ export type Delivery = 'hold' | 'tmux' | 'resume' | 'fork' | 'queue' | 'none';
 const PREFIX = 'The developer said by phone (via CallMeClaude): ';
 
 /** argv for a voice-started headless session: same permission mode as resumeHeadless, session id fixed up front. */
-export function headlessStartArgs(sessionId: string, task: string): string[] {
-  return ['-p', '--session-id', sessionId, '--permission-mode', 'acceptEdits', task];
+export function headlessStartArgs(sessionId: string, task: string, mode: PermissionMode = 'bypassPermissions'): string[] {
+  return ['-p', '--session-id', sessionId, '--permission-mode', mode, task];
 }
 
 /**
@@ -38,8 +38,8 @@ export function headlessIds(psOutput: string): Set<string> {
 }
 
 /** argv for a headless copy of an idle session: same conversation, new id fixed up front (so a callback can bind to it). */
-export function forkArgs(sessionId: string, forkId: string, text: string): string[] {
-  return ['-p', '--resume', sessionId, '--fork-session', '--session-id', forkId, '--permission-mode', 'acceptEdits', PREFIX + text];
+export function forkArgs(sessionId: string, forkId: string, text: string, mode: PermissionMode = 'bypassPermissions'): string[] {
+  return ['-p', '--resume', sessionId, '--fork-session', '--session-id', forkId, '--permission-mode', mode, PREFIX + text];
 }
 
 /**
@@ -118,7 +118,7 @@ export class Controller {
       const forkId = randomUUID();
       this.forks.set(s.id, forkId);
       this.st.upsertSession(forkId, s.cwd, { state: 'running', summary: 'Instruction delivered, working.', lastPrompt: s.lastPrompt });
-      this.runBackground(forkId, forkArgs(s.id, forkId, text), s.cwd);
+      this.runBackground(forkId, forkArgs(s.id, forkId, text, sessionPermissionMode(this.cfg)), s.cwd);
       // The project name now means the fork; the idle window comes back on its next hook if the developer types there.
       this.mark(s, 'ended', 'Continued in a background copy (phone instruction).');
       audit('session.fork', { session: s.id, fork: forkId, text });
@@ -189,7 +189,7 @@ export class Controller {
   async startSession(dir: string, task: string, onStuck?: (why: string) => void): Promise<string> {
     if (voiceSessionMode(this.cfg) === 'headless') return this.startHeadless(dir, task);
     const name = 'cmc-' + norm(dir.split('/').pop() ?? 'session').slice(0, 20) + '-' + Date.now().toString(36).slice(-4);
-    await execFileP('tmux', ['new-session', '-d', '-s', name, '-c', dir, '-x', '200', '-y', '50', 'claude', task]);
+    await execFileP('tmux', ['new-session', '-d', '-s', name, '-c', dir, '-x', '200', '-y', '50', 'claude', '--permission-mode', sessionPermissionMode(this.cfg), task]);
     audit('session.start', { dir, task, tmux: name });
     void this.passStartupScreens(name, dir).then((why) => {
       if (why) {
@@ -246,7 +246,7 @@ export class Controller {
     }
     const id = randomUUID();
     this.st.upsertSession(id, dir, { state: 'running', summary: 'Session started, working.' });
-    const child = this.runBackground(id, headlessStartArgs(id, task), dir);
+    const child = this.runBackground(id, headlessStartArgs(id, task, sessionPermissionMode(this.cfg)), dir);
     audit('session.start', { dir, task, headless: id, pid: child.pid });
     return id;
   }
@@ -309,7 +309,7 @@ export class Controller {
   }
 
   private resumeHeadless(s: Session, text: string) {
-    this.runBackground(s.id, ['-p', '--resume', s.id, '--permission-mode', 'acceptEdits', PREFIX + text], s.cwd);
+    this.runBackground(s.id, ['-p', '--resume', s.id, '--permission-mode', sessionPermissionMode(this.cfg), PREFIX + text], s.cwd);
     audit('session.resume', { session: s.id, text });
   }
 

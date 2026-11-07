@@ -146,6 +146,24 @@ test('full permission by default: edits, commands and pushes go through; a payme
   hub.calls.takeAgenda();
 });
 
+test('full permission mode: ordinary tools pass PreToolUse, a critical one is turned into a permission prompt', async () => {
+  const ok: any = await hook('PreToolUse', { session_id: 's_bp', cwd: '/x/api', permission_mode: 'bypassPermissions', tool_name: 'Bash', tool_input: { command: 'git push origin main' } });
+  assert.equal(ok.hookSpecificOutput, undefined);
+  const wipe: any = await hook('PreToolUse', { session_id: 's_bp', cwd: '/x/api', permission_mode: 'bypassPermissions', tool_name: 'Bash', tool_input: { command: 'rm -rf ~' } });
+  assert.equal(wipe.hookSpecificOutput.permissionDecision, 'ask');
+  const card: any = await hook('PreToolUse', {
+    session_id: 's_bp',
+    cwd: '/x/api',
+    permission_mode: 'bypassPermissions',
+    tool_name: 'mcp__claude-in-chrome__form_input',
+    tool_input: { ref: 'card', value: '4242 4242 4242 4242' },
+  });
+  assert.equal(card.hookSpecificOutput.permissionDecision, 'ask');
+  assert.match(card.hookSpecificOutput.permissionDecisionReason, /card number/);
+  const plan: any = await hook('PreToolUse', { session_id: 's_bp', cwd: '/x/api', permission_mode: 'plan', tool_name: 'Bash', tool_input: { command: 'rm -rf ~' } });
+  assert.equal(plan.hookSpecificOutput, undefined);
+});
+
 test('permission request ("ask" mode): auto-approve rule, then held + approved', async () => {
   hub.cfg.approvals = 'ask';
   after(() => delete hub.cfg.approvals);

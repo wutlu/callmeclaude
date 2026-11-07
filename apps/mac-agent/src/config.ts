@@ -70,10 +70,26 @@ export interface Config {
    * read-only requests and autoApprove rules.
    */
   approvals?: 'critical' | 'ask';
+  /**
+   * Claude Code's permission mode for every session. 'bypass' (default, also when absent): sessions run like
+   * `claude --dangerously-skip-permissions`; `cmc setup` sets it as Claude Code's default mode, and the sessions
+   * the hub starts get it too. Critical actions still ask (the PreToolUse hook). 'keep': leave Claude Code's own
+   * mode alone; hub-started sessions use acceptEdits.
+   */
+  sessionPermissions?: 'bypass' | 'keep';
+  /** Claude Code's defaultMode before `cmc setup` switched it to bypassPermissions (restored by uninstall). */
+  claudeDefaultModeBefore?: string | null;
   /** In 'ask' mode, approve requests that only read (files, git/CI status) without calling. Absent = on. */
   autoApproveReadOnly?: boolean;
   /** Linux only, chosen by `cmc setup` (absent = tmux). Not in the defaults, so macOS configs never get this key. */
   voiceSessions?: VoiceSessions;
+}
+
+export type PermissionMode = 'bypassPermissions' | 'acceptEdits';
+
+/** The --permission-mode for sessions the hub starts. */
+export function sessionPermissionMode(cfg: Pick<Config, 'sessionPermissions'>): PermissionMode {
+  return cfg.sessionPermissions === 'keep' ? 'acceptEdits' : 'bypassPermissions';
 }
 
 export function defaultRoots(os: NodeJS.Platform = process.platform, home = homedir()): string[] {

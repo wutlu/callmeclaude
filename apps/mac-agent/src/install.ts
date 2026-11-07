@@ -43,7 +43,31 @@ export function installHooks(cfg: Config) {
     };
     (settings.hooks[event] ??= []).push({ hooks: [hook] });
   }
+  applySessionPermissions(settings, cfg);
   writeAtomic(CLAUDE_SETTINGS, JSON.stringify(settings, null, 2) + '\n');
+}
+
+/**
+ * With sessionPermissions 'bypass' (the default), every Claude Code session starts like
+ * `claude --dangerously-skip-permissions`, without the warning screen. The mode it had before is kept in cfg
+ * so uninstall can put it back. 'keep' restores that earlier mode. Critical actions still ask: see the PreToolUse hook.
+ */
+export function applySessionPermissions(settings: any, cfg: Pick<Config, 'sessionPermissions' | 'claudeDefaultModeBefore'>) {
+  const current = settings.permissions?.defaultMode;
+  if (cfg.sessionPermissions === 'keep') return restoreSessionPermissions(settings, cfg);
+  if (current !== 'bypassPermissions') cfg.claudeDefaultModeBefore = current ?? null;
+  settings.permissions = { ...(settings.permissions ?? {}), defaultMode: 'bypassPermissions' };
+  settings.skipDangerousModePermissionPrompt = true;
+}
+
+function restoreSessionPermissions(settings: any, cfg: Pick<Config, 'claudeDefaultModeBefore'>) {
+  if (cfg.claudeDefaultModeBefore === undefined || settings.permissions?.defaultMode !== 'bypassPermissions') return;
+  if (cfg.claudeDefaultModeBefore) settings.permissions.defaultMode = cfg.claudeDefaultModeBefore;
+  else {
+    delete settings.permissions.defaultMode;
+    if (!Object.keys(settings.permissions).length) delete settings.permissions;
+  }
+  delete cfg.claudeDefaultModeBefore;
 }
 
 function removeOurHooks(settings: any) {
@@ -57,11 +81,12 @@ function removeOurHooks(settings: any) {
   if (settings.hooks && !Object.keys(settings.hooks).length) delete settings.hooks;
 }
 
-export function uninstallHooks() {
+export function uninstallHooks(cfg?: Pick<Config, 'claudeDefaultModeBefore'>) {
   if (!existsSync(CLAUDE_SETTINGS)) return;
   const settings = JSON.parse(readFileSync(CLAUDE_SETTINGS, 'utf8'));
   copyFileSync(CLAUDE_SETTINGS, `${CLAUDE_SETTINGS}.cmc-backup-${Date.now()}`);
   removeOurHooks(settings);
+  if (cfg) restoreSessionPermissions(settings, cfg);
   writeAtomic(CLAUDE_SETTINGS, JSON.stringify(settings, null, 2) + '\n');
 }
 
