@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Snapshot } from '@callmeclaude/protocol';
-import { autostartEntry, floatToPcm16, hubDataDir, panelPosition, parseHubConfig, parseSettings, pcm16ToFloat, trayLook } from '../src/shared.ts';
+import { autostartEntry, orderSessions, timeLeft, floatToPcm16, hubDataDir, panelPosition, parseHubConfig, parseSettings, pcm16ToFloat, trayLook } from '../src/shared.ts';
 
 const snap = (over: Partial<Snapshot> = {}): Snapshot => ({
   mode: 'away',
@@ -76,4 +76,20 @@ test('desktop settings: auto-answer is off unless saved as on, broken files fall
   assert.deepEqual(parseSettings('{"autoAnswer":"yes"}'), { autoAnswer: false });
   assert.deepEqual(parseSettings('null'), { autoAnswer: false });
   assert.deepEqual(parseSettings('{not json'), { autoAnswer: false });
+});
+
+test('orderSessions puts sessions that need you first and folds old finished ones', () => {
+  const now = Date.parse('2026-11-08T12:00:00Z');
+  const at = (h: number) => new Date(now - h * 3600_000).toISOString();
+  const list = [
+    { id: 'old-done', state: 'done', updatedAt: at(30) },
+    { id: 'run', state: 'running', updatedAt: at(0.1) },
+    { id: 'done', state: 'done', updatedAt: at(1) },
+    { id: 'ask', state: 'waiting_input', updatedAt: at(20) },
+  ];
+  const { recent, earlier } = orderSessions(list, now);
+  assert.deepEqual(recent.map((s) => s.id), ['ask', 'run', 'done']);
+  assert.deepEqual(earlier.map((s) => s.id), ['old-done']);
+  assert.equal(timeLeft(new Date(now + 23.2 * 60_000).toISOString(), now), '24 min');
+  assert.equal(timeLeft(new Date(now + 40_000).toISOString(), now), '40 s');
 });

@@ -166,3 +166,22 @@ export function pcm16ToFloat(b: ArrayBuffer): Float32Array {
   for (let i = 0; i < n; i++) out[i] = v.getInt16(i * 2, true) / 0x8000;
   return out;
 }
+
+/** Sessions that need you first, then working ones, then the rest; within a group, newest first. */
+const STATE_RANK: Record<string, number> = { waiting_permission: 0, waiting_input: 0, blocked: 0, errored: 0, running: 1 };
+/** Finished or quiet sessions older than this fold under "Earlier". */
+export const EARLIER_MS = 6 * 3600_000;
+
+export function orderSessions<T extends { state: string; updatedAt: string }>(list: T[], now = Date.now()): { recent: T[]; earlier: T[] } {
+  const rank = (s: T) => STATE_RANK[s.state] ?? 2;
+  const sorted = [...list].sort((a, b) => rank(a) - rank(b) || b.updatedAt.localeCompare(a.updatedAt));
+  const old = (s: T) => rank(s) === 2 && now - Date.parse(s.updatedAt) > EARLIER_MS;
+  return { recent: sorted.filter((s) => !old(s)), earlier: sorted.filter(old) };
+}
+
+/** "24 min" left on a held decision; at the deadline it goes back to the computer. */
+export function timeLeft(deadline: string, now = Date.now()): string {
+  const s = Math.max(0, Math.round((Date.parse(deadline) - now) / 1000));
+  if (!isFinite(s)) return '';
+  return s >= 60 ? `${Math.ceil(s / 60)} min` : `${s} s`;
+}

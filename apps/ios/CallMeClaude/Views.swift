@@ -60,6 +60,7 @@ struct HomeView: View {
     @State private var showSettings = false
     @State private var confirmPanic = false
     @State private var showRepair = false
+    @State private var showEarlier = false
 
     var body: some View {
         NavigationStack {
@@ -67,21 +68,33 @@ struct HomeView: View {
                 VStack(spacing: 18) {
                     ConnectionPill()
                     if hub.unreachable && !hub.connected { RepairCard { showRepair = true } }
-                    CallHero()
-                    ModePicker()
                     if hub.snapshot?.paused == true { PausedBanner() }
+                    // A held decision is why the app was opened: it comes first.
                     if let pend = hub.snapshot?.pending, !pend.isEmpty {
                         SectionHeader(title: "Needs your decision", count: pend.count)
                         ForEach(pend) { PendingCardView(p: $0) }
                     }
+                    CallHero()
+                    ModePicker()
                     SectionHeader(title: "Sessions", count: hub.snapshot?.sessions.count ?? 0)
-                    if (hub.snapshot?.sessions ?? []).isEmpty {
+                    let list = orderSessions(hub.snapshot?.sessions ?? [])
+                    if list.recent.isEmpty && list.earlier.isEmpty {
                         Card {
                             Text(hub.connected ? "No open Claude Code sessions." : "Waiting for your Mac…")
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    ForEach(hub.snapshot?.sessions ?? []) { SessionCardView(s: $0) }
+                    ForEach(list.recent) { SessionCardView(s: $0) }
+                    if !list.earlier.isEmpty {
+                        Button {
+                            withAnimation { showEarlier.toggle() }
+                        } label: {
+                            Label(showEarlier ? "Hide earlier" : "Earlier (\(list.earlier.count))", systemImage: showEarlier ? "chevron.up" : "chevron.down")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        if showEarlier { ForEach(list.earlier) { SessionCardView(s: $0) } }
+                    }
                     if hub.snapshot?.paused != true {
                         Button(role: .destructive) { confirmPanic = true } label: {
                             Label("Stop everything", systemImage: "stop.circle.fill")
@@ -235,6 +248,7 @@ struct SectionHeader: View {
 
 struct SessionCardView: View {
     let s: SessionCard
+    @State private var open = false
     var body: some View {
         Card {
             HStack(alignment: .firstTextBaseline) {
@@ -243,40 +257,101 @@ struct SessionCardView: View {
                 Spacer()
                 Text(SessionStateUI.label(s.state)).font(.caption.weight(.medium)).foregroundStyle(Theme.stateColor(s.state))
             }
-            Text(s.summary).font(.callout).foregroundStyle(.secondary).lineLimit(3)
-            Text(relative(s.updatedAt)).font(.caption2).foregroundStyle(.tertiary)
+            Text(s.summary).font(.callout).foregroundStyle(open ? .primary : .secondary).lineLimit(open ? nil : 3)
+                .textSelection(.enabled)
+            Text(relative(s.updatedAt)).font(.caption2).foregroundStyle(.secondary)
         }
+        .contentShape(Rectangle())
+        .onTapGesture { withAnimation(.easeInOut(duration: 0.2)) { open.toggle() } }
+        .accessibilityHint(open ? "Shows less" : "Shows the whole summary")
     }
 }
 
 struct PendingCardView: View {
     let p: PendingCard
     @EnvironmentObject var hub: HubClient
+    @State private var reply = ""
+    private var hot: Bool { p.risk == "high" || p.risk == "critical" }
+    private var ask: Bool { p.kind == "permission" }
+
     var body: some View {
-        Card(tint: .orange) {
+        Card(tint: hot ? .red : .orange) {
             HStack {
                 Text(p.project).font(.subheadline.weight(.semibold))
                 Spacer()
-                Text(p.risk.uppercased())
+                Text(ask ? p.risk.uppercased() : "QUESTION")
                     .font(.caption2.weight(.bold))
                     .padding(.horizontal, 7).padding(.vertical, 3)
-                    .background(p.risk == "high" || p.risk == "critical" ? Color.red.opacity(0.3) : Theme.card, in: Capsule())
+                    .background(hot ? Color.red.opacity(0.3) : Theme.card, in: Capsule())
             }
             Text(p.summary).font(.callout)
-            HStack(spacing: 8) {
-                Button("Approve") { hub.resolve(p.id, "approve") }.buttonStyle(.borderedProminent).tint(.green)
-                Button("Deny") { hub.resolve(p.id, "deny") }.buttonStyle(.bordered)
-                Button("Let it stop") { hub.resolve(p.id, "release") }.buttonStyle(.bordered)
+            Label("Waits \(timeLeft(p.deadline)) more, then goes back to the Mac.", systemImage: "clock")
+                .font(.caption).foregroundStyle(.secondary)
+            if ask {
+                HStack(spacing: 8) {
+                    Button("Approve") { hub.resolve(p.id, "approve") }.buttonStyle(.borderedProminent).tint(.green)
+                    Button("Deny") { hub.resolve(p.id, "deny") }.buttonStyle(.bordered)
+                    Button("Let it stop") { hub.resolve(p.id, "release") }.buttonStyle(.bordered)
+                }
+                .font(.footnote)
+            } else {
+                // The session asked something or finished: it needs words, not a bare yes.
+                TextField("Reply to Claude…", text: $reply, axis: .vertical)
+                    .lineLimit(1...4)
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.send)
+                    .onSubmit(send)
+                HStack(spacing: 8) {
+                    Button("Send", action: send).buttonStyle(.borderedProminent).disabled(reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    Button("Let it stop") { hub.resolve(p.id, "release") }.buttonStyle(.bordered)
+                }
+                .font(.footnote)
             }
-            .font(.footnote)
         }
+    }
+
+    private func send() {
+        let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        hub.resolve(p.id, "approve", note: text)
+        reply = ""
     }
 }
 
-func relative(_ iso: String) -> String {
+/// Sessions that need you first, then working ones, then the rest, newest first; finished ones older than 6 h go to `earlier`.
+func orderSessions(_ list: [SessionCard], now: Date = Date()) -> (recent: [SessionCard], earlier: [SessionCard]) {
+    func rank(_ s: SessionCard) -> Int {
+        switch s.state {
+        case "waiting_permission", "waiting_input", "blocked", "errored": return 0
+        case "running": return 1
+        default: return 2
+        }
+    }
+    let sorted = list.sorted { rank($0) != rank($1) ? rank($0) < rank($1) : $0.updatedAt > $1.updatedAt }
+    func old(_ s: SessionCard) -> Bool {
+        guard rank(s) == 2, let d = parseISO(s.updatedAt) else { return false }
+        return now.timeIntervalSince(d) > 6 * 3600
+    }
+    return (sorted.filter { !old($0) }, sorted.filter(old))
+}
+
+/// "24 min" left on a held decision.
+func timeLeft(_ deadline: String, now: Date = Date()) -> String {
+    guard let d = parseISO(deadline) else { return "" }
+    let s = max(0, Int(d.timeIntervalSince(now).rounded()))
+    return s >= 60 ? "\((s + 59) / 60) min" : "\(s) s"
+}
+
+func parseISO(_ iso: String) -> Date? {
     let f = ISO8601DateFormatter()
     f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    guard let d = f.date(from: iso) else { return "" }
+    if let d = f.date(from: iso) { return d }
+    f.formatOptions = [.withInternetDateTime]
+    return f.date(from: iso)
+}
+
+func relative(_ iso: String) -> String {
+    guard let d = parseISO(iso) else { return "" }
     let r = RelativeDateTimeFormatter()
     r.locale = Locale(identifier: "en_US")
     r.unitsStyle = .short

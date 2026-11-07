@@ -37,3 +37,30 @@ fun relative(iso: String, now: Instant = Instant.now()): String {
     }
     return "$n $unit ago"
 }
+
+private val NEEDS_YOU = setOf("waiting_permission", "waiting_input", "blocked", "errored")
+
+/** Finished or quiet sessions older than this fold under "Earlier" (same as the desktop panel). */
+const val EARLIER_SECONDS = 6 * 3_600L
+
+/** Sessions that need you first, then working ones, then the rest, newest first; old finished ones go to `earlier`. */
+fun <T> orderSessions(list: List<T>, state: (T) -> String, updatedAt: (T) -> String, now: Instant = Instant.now()): Pair<List<T>, List<T>> {
+    fun rank(s: T) = when (state(s)) {
+        in NEEDS_YOU -> 0
+        "running" -> 1
+        else -> 2
+    }
+    val sorted = list.sortedWith(compareBy<T> { rank(it) }.thenByDescending { updatedAt(it) })
+    fun old(s: T): Boolean {
+        val t = try { Instant.parse(updatedAt(s)) } catch (_: DateTimeParseException) { return false }
+        return rank(s) == 2 && Duration.between(t, now).seconds > EARLIER_SECONDS
+    }
+    return sorted.filterNot(::old) to sorted.filter(::old)
+}
+
+/** "24 min" left on a held decision; when it runs out the decision goes back to the computer. */
+fun timeLeft(deadline: String, now: Instant = Instant.now()): String {
+    val t = try { Instant.parse(deadline) } catch (_: DateTimeParseException) { return "" }
+    val s = Duration.between(now, t).seconds.coerceAtLeast(0)
+    return if (s >= 60) "${(s + 59) / 60} min" else "$s s"
+}

@@ -53,7 +53,13 @@ body.os-darwin #app, body.os-win32 #app { background: linear-gradient(180deg, va
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* layout */
-header { padding: 12px 14px 6px; -webkit-app-region: drag; }
+header { padding: 12px 14px 0; -webkit-app-region: drag; }
+.tabs { display: flex; gap: 4px; margin: 10px 0 2px; padding: 3px; border-radius: 10px; background: var(--card); -webkit-app-region: no-drag; }
+.tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+.tabs button .i { width: 14px; height: 14px; vertical-align: 0; }
+.tabs button:hover:not(.on) { color: var(--text); }
+.tabs button.on { background: var(--card-hi); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
+.tabs .dot { min-width: 17px; height: 17px; padding: 0 5px; border-radius: 99px; background: var(--orange); color: #1c1c1e; font-size: 10.5px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
 header button, header select { -webkit-app-region: no-drag; }
 .brand { gap: 8px; }
 .logo { width: 24px; height: 24px; border-radius: 7px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
@@ -94,14 +100,15 @@ code { font-size: 12px; user-select: text; }
 .badge.red { background: color-mix(in srgb, var(--red) 18%, transparent); color: var(--red); }
 .badge.green { background: color-mix(in srgb, var(--green) 18%, transparent); color: var(--green); }
 
-/* hero: big green call button, like the phone */
-.hero { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 0 6px; }
-.callbtn { width: 84px; height: 84px; border-radius: 50%; border: none; cursor: pointer; color: #fff; background: radial-gradient(circle at 35% 30%, #4fdc74, var(--green) 60%, #24a447); box-shadow: 0 10px 28px color-mix(in srgb, var(--green) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25); display: flex; align-items: center; justify-content: center; margin-bottom: 6px; transition: transform 0.12s ease, box-shadow 0.12s ease; }
-.callbtn .i { width: 34px; height: 34px; vertical-align: 0; fill: currentColor; stroke-width: 1.5; }
-.callbtn:hover:not(:disabled) { transform: scale(1.05); box-shadow: 0 12px 34px color-mix(in srgb, var(--green) 55%, transparent); }
-.callbtn:active:not(:disabled) { transform: scale(0.97); }
+/* hero: the green call button with what it does next to it */
+.hero { gap: 14px; margin-top: 10px; padding: 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--stroke); }
+.hero h2 { font-size: 15px; }
+.hero p { font-size: 11.5px; margin-top: 2px; line-height: 1.35; }
+.callbtn { width: 52px; height: 52px; flex: none; border-radius: 50%; border: none; cursor: pointer; color: #fff; background: radial-gradient(circle at 35% 30%, #4fdc74, var(--green) 60%, #24a447); box-shadow: 0 6px 18px color-mix(in srgb, var(--green) 45%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.25); display: flex; align-items: center; justify-content: center; transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.callbtn .i { width: 24px; height: 24px; vertical-align: 0; fill: currentColor; stroke-width: 1.5; }
+.callbtn:hover:not(:disabled) { transform: scale(1.06); box-shadow: 0 8px 22px color-mix(in srgb, var(--green) 55%, transparent); }
+.callbtn:active:not(:disabled) { transform: scale(0.96); }
 .callbtn:disabled { filter: grayscale(1); opacity: 0.45; cursor: default; box-shadow: none; }
-.hero p { font-size: 12px; }
 
 /* call screen */
 .callscreen { margin-top: 6px; padding: 18px 14px 14px; border-radius: 18px; text-align: center; background: linear-gradient(180deg, #2a2a2e, #0e0e10); color: #f2f2f4; border: 1px solid rgba(255, 255, 255, 0.08); }
@@ -137,6 +144,8 @@ code { font-size: 12px; user-select: text; }
 .tiles button .i { width: 19px; height: 19px; }
 .tiles button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .tiles button:hover:not(:disabled):not(.on) { background: var(--card-hi); }
+.tiles.compact button { flex-direction: row; justify-content: center; padding: 8px 4px; gap: 5px; }
+.tiles.compact button .i { width: 15px; height: 15px; }
 .tiles button.on { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: var(--accent); color: var(--accent); }
 .tiles button:disabled { opacity: 0.45; cursor: default; }
 .hint { color: var(--muted); font-size: 11px; margin: 6px 4px 0; min-height: 15px; }
@@ -174,7 +183,14 @@ code { font-size: 12px; user-select: text; }
 /* sessions */
 .session .summary { margin-top: 6px; font-size: 12.5px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .session b { font-size: 13px; }
-.time { display: block; margin-top: 6px; font-size: 11px; color: var(--faint); }
+.time { display: block; margin-top: 6px; font-size: 11px; color: var(--muted); opacity: 0.8; }
+.session { cursor: pointer; transition: background 0.12s ease; }
+.session:hover { background: var(--card-hi); }
+.session.open .summary { -webkit-line-clamp: unset; display: block; user-select: text; color: var(--text); }
+.more { margin: 10px 2px 0; font-size: 12px; font-weight: 600; }
+.more .i { width: 14px; height: 14px; }
+.left { display: flex; align-items: center; gap: 5px; margin-top: 8px; font-size: 11px; }
+.left .i { width: 12px; height: 12px; vertical-align: 0; }
 .sticon { display: inline-flex; color: var(--gray); }
 .st { font-size: 11px; font-weight: 600; color: var(--gray); flex: none; }
 .st-running { color: var(--blue); }

@@ -8,7 +8,10 @@ A tray app for macOS and Linux. It connects to the hub on the same computer the 
   - Red: automation is paused.
   - Green: Claude is calling, or a call is running, on this computer or on the phone.
   - Gray: the hub is not running.
-- **Click the icon** to open the panel: Talk to Claude, where calls go, approvals, mode, sessions, voice language, start at login, and Stop everything. Right-click (or the menu on Linux) has the same options.
+- **Click the icon** to open the panel. It has two tabs:
+  - **Home**: Talk to Claude, decisions waiting for you (with how long each one still waits), mode, sessions, and Stop everything. Sessions that need you come first; finished ones older than 6 hours fold under **Earlier**. Click a session to read its whole summary.
+  - **Settings**: where calls go, the spoken alert when a session finishes, voice language, answering automatically, and start at login.
+  - Right-click the icon (or use the menu on Linux) for the same options.
 - **Where Claude calls you**: **Call this computer**, **Call my phone**, or **Don't call**.
   - With "this computer", the app rings and you answer with the computer's microphone, so no phone is needed.
   - **Answer calls automatically** (Settings, or the tray menu) picks the call up after 4 seconds of ringing, hands-free. Decline still works while it rings. The choice is kept by the app on this computer.

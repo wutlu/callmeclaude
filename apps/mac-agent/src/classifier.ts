@@ -1,6 +1,6 @@
 import type { Risk, SessionState } from '@callmeclaude/protocol';
 import { oneShot, parseJsonLoose } from './claude.ts';
-import { clip, languageName, log } from './util.ts';
+import { clip, languageName, log, plainText } from './util.ts';
 
 export interface Classification {
   state: Extract<SessionState, 'done' | 'waiting_input' | 'blocked' | 'errored'>;
@@ -24,10 +24,10 @@ export function quickClassify(msg: string): Classification {
   const m = msg || '';
   if (BLOCKED.some((r) => r.test(m))) {
     const reason = /captcha/i.test(m) ? 'captcha' : /2fa|two-factor|verification|otp|doğrulama/i.test(m) ? '2fa' : 'needs_approval';
-    return { state: 'blocked', reason, summary: clip(m, 140), risk: 'medium' };
+    return { state: 'blocked', reason, summary: clip(plainText(m), 140), risk: 'medium' };
   }
-  if (QUESTION.some((r) => r.test(m.slice(-400)))) return { state: 'waiting_input', reason: 'question', summary: clip(m, 140), risk: 'low' };
-  return { state: 'done', reason: 'done', summary: clip(m, 140), risk: 'low' };
+  if (QUESTION.some((r) => r.test(m.slice(-400)))) return { state: 'waiting_input', reason: 'question', summary: clip(plainText(m), 140), risk: 'low' };
+  return { state: 'done', reason: 'done', summary: clip(plainText(m), 140), risk: 'low' };
 }
 
 const SYSTEM = `You triage Claude Code sessions for a developer who is away from the computer and will hear your summary over a phone call.

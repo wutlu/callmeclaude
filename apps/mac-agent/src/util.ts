@@ -70,3 +70,19 @@ export function redact(s: string) {
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[redacted key]')
     .replace(/eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{10,}/g, '[redacted token]');
 }
+
+/** Markdown out, plain words in: for summaries shown on cards and read aloud ("**done**, see `a.ts`" → "done, see a.ts"). */
+export function plainText(s: string | undefined) {
+  if (!s) return '';
+  return s
+    .replace(/```[a-z0-9_-]*\s*/gi, '') // code fences (keep what is inside)
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links and images → their text
+    .replace(/(\*\*|__)(.+?)\1/g, '$2') // bold
+    .replace(/(^|[\s(])[*_]([^*_\s][^*_]*?)[*_](?=[\s).,;:!?]|$)/g, '$1$2') // italic
+    .replace(/`([^`]*)`/g, '$1') // inline code
+    .replace(/^\s{0,3}(#{1,6}\s+|>\s?|[-*+]\s+(?=\S)|\d+[.)]\s+(?=\S))/gm, '') // headings, quotes, list markers
+    .replace(/([:.;!?])\s+[-*+]\s+(?=\S)/g, '$1 ') // a list flattened onto one line ("Done: - a")
+    .replace(/\*\*+|`+/g, '') // stray markers (a clipped "**…")
+    .replace(/\s+/g, ' ')
+    .trim();
+}

@@ -32,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -50,6 +51,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -133,6 +139,8 @@ private fun HomeScreen(hub: HubClient, calls: CallManager, callRequest: MutableS
     val sessions = snapshot?.sessions.orEmpty()
     val pending = snapshot?.pending.orEmpty()
     val paused = snapshot?.paused == true
+    val (recent, earlier) = remember(sessions) { orderSessions(sessions, { it.state }, { it.updatedAt }) }
+    var showEarlier by rememberSaveable { mutableStateOf(false) }
 
     // Hub errors outside a call: shown as the hub sent them, once, then gone.
     // Collected only while the screen is visible, so a notice isn't consumed in the background.
@@ -186,15 +194,16 @@ private fun HomeScreen(hub: HubClient, calls: CallManager, callRequest: MutableS
                         onDismissBattery = health.dismissBattery,
                     )
                 }
-                item { CallHero(onCall = placeCall, enabled = pairing != null) }
-                item { ModePicker(current = snapshot?.mode ?: "away", onPick = hub::setMode) }
                 if (paused) item { PausedBanner(onResume = hub::resume) }
+                // A held decision is why the app was opened: it comes first.
                 if (pending.isNotEmpty()) {
                     item { SectionHeader("Needs your decision", pending.size) }
                     items(pending, key = { "p_" + it.id }) { p ->
-                        PendingCardView(p, onDecision = { d -> hub.resolve(p.id, d) })
+                        PendingCardView(p, onDecision = { d, note -> hub.resolve(p.id, d, note) })
                     }
                 }
+                item { CallHero(onCall = placeCall, enabled = pairing != null) }
+                item { ModePicker(current = snapshot?.mode ?: "away", onPick = hub::setMode) }
                 item { SectionHeader("Sessions", sessions.size) }
                 if (sessions.isEmpty()) {
                     item {
@@ -206,7 +215,15 @@ private fun HomeScreen(hub: HubClient, calls: CallManager, callRequest: MutableS
                         }
                     }
                 }
-                items(sessions, key = { "s_" + it.id }) { SessionCardView(it) }
+                items(recent, key = { "s_" + it.id }) { SessionCardView(it) }
+                if (earlier.isNotEmpty()) {
+                    item(key = "earlier") {
+                        TextButton(onClick = { showEarlier = !showEarlier }) {
+                            Text(if (showEarlier) "Hide earlier" else "Earlier (${earlier.size})", color = Palette.accent)
+                        }
+                    }
+                    if (showEarlier) items(earlier, key = { "s_" + it.id }) { SessionCardView(it) }
+                }
                 if (!paused) {
                     item {
                         OutlinedButton(
@@ -237,12 +254,14 @@ private fun HomeScreen(hub: HubClient, calls: CallManager, callRequest: MutableS
 }
 
 @Composable
-fun Card(tint: Color? = null, content: @Composable ColumnScope.() -> Unit) {
+fun Card(tint: Color? = null, onClick: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     val shape = RoundedCornerShape(16.dp)
     Column(
         verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
+            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .background(Palette.card, shape)
             .border(1.dp, tint?.copy(alpha = 0.6f) ?: Palette.stroke, shape)
             .padding(14.dp),
@@ -340,7 +359,8 @@ private fun SectionHeader(title: String, count: Int) {
 
 @Composable
 private fun SessionCardView(s: SessionCard) {
-    Card {
+    var open by rememberSaveable(s.id) { mutableStateOf(false) }
+    Card(onClick = { open = !open }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Dot(Palette.state(s.state), 10)
             Spacer(Modifier.width(8.dp))
@@ -356,8 +376,8 @@ private fun SessionCardView(s: SessionCard) {
         Text(
             s.summary,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 3,
+            color = if (open) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (open) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
         )
         Text(relative(s.updatedAt), style = MaterialTheme.typography.labelSmall, color = Palette.gray)
@@ -365,13 +385,14 @@ private fun SessionCardView(s: SessionCard) {
 }
 
 @Composable
-private fun PendingCardView(p: PendingCard, onDecision: (Decision) -> Unit) {
-    Card(tint = Palette.orange) {
+private fun PendingCardView(p: PendingCard, onDecision: (Decision, String?) -> Unit) {
+    val hot = p.risk == "high" || p.risk == "critical"
+    val ask = p.kind == "permission"
+    Card(tint = if (hot) Palette.red else Palette.orange) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(p.project, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
-            val hot = p.risk == "high" || p.risk == "critical"
             Text(
-                p.risk.uppercase(),
+                if (ask) p.risk.uppercase() else "QUESTION",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
@@ -380,13 +401,40 @@ private fun PendingCardView(p: PendingCard, onDecision: (Decision) -> Unit) {
             )
         }
         Text(p.summary, style = MaterialTheme.typography.bodyMedium)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(
-                onClick = { onDecision(Decision.APPROVE) },
-                colors = ButtonDefaults.buttonColors(containerColor = Palette.green, contentColor = Color.White),
-            ) { Text("Approve") }
-            OutlinedButton(onClick = { onDecision(Decision.DENY) }) { Text("Deny") }
-            OutlinedButton(onClick = { onDecision(Decision.RELEASE) }) { Text("Let it stop") }
+        Text(
+            "Waits ${timeLeft(p.deadline)} more, then goes back to the computer.",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (ask) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { onDecision(Decision.APPROVE, null) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Palette.green, contentColor = Color.White),
+                ) { Text("Approve") }
+                OutlinedButton(onClick = { onDecision(Decision.DENY, null) }) { Text("Deny") }
+                OutlinedButton(onClick = { onDecision(Decision.RELEASE, null) }) { Text("Let it stop") }
+            }
+        } else {
+            // The session asked something or finished: it needs words, not a bare yes.
+            var reply by rememberSaveable(p.id) { mutableStateOf("") }
+            OutlinedTextField(
+                value = reply,
+                onValueChange = { reply = it },
+                placeholder = { Text("Reply to Claude…") },
+                maxLines = 4,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { if (reply.isNotBlank()) onDecision(Decision.APPROVE, reply.trim()) }),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = { onDecision(Decision.APPROVE, reply.trim()) },
+                    enabled = reply.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Palette.accent, contentColor = Color.White),
+                ) { Text("Send") }
+                OutlinedButton(onClick = { onDecision(Decision.RELEASE, null) }) { Text("Let it stop") }
+            }
         }
     }
 }

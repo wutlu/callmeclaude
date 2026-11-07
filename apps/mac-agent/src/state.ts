@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import type { CallInfo, DoneAlertTarget, PendingCard, RingTarget, SessionCard, SessionState, Snapshot, Risk } from '@callmeclaude/protocol';
 import { STATE_PATH, writeAtomic, type Mode } from './config.ts';
-import { log } from './util.ts';
+import { log, plainText } from './util.ts';
 
 export const HUB_VERSION = '0.1.0';
 
@@ -244,7 +244,7 @@ export class State extends EventEmitter {
           sessionId: p.sessionId,
           project: p.project,
           kind: p.kind,
-          summary: p.summary,
+          summary: plainText(p.summary),
           risk: p.risk,
           createdAt: p.createdAt,
           deadline: p.deadline,
@@ -267,7 +267,7 @@ const toCard =
       project: s.project,
       cwd: s.cwd,
       state: s.state,
-      summary: s.summary,
+      summary: plainText(s.summary),
       updatedAt: s.updatedAt,
       controllable: c,
       ...(s.background ? { background: true } : {}),

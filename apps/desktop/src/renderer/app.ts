@@ -1,7 +1,7 @@
 // The panel: hub link, call handling, and the same controls as the phone app.
 import type { AppToHub, HubToApp, PendingCard, SessionCard, Snapshot } from '@callmeclaude/protocol';
 import { PROTOCOL_VERSION } from '@callmeclaude/protocol';
-import { AUTO_ANSWER_MS, DONE_ALERTS, LANGUAGES, MODES, RING_TARGETS, stateLabel, type HubConfig, type View } from '../shared.ts';
+import { AUTO_ANSWER_MS, DONE_ALERTS, LANGUAGES, MODES, RING_TARGETS, orderSessions, stateLabel, timeLeft, type HubConfig, type View } from '../shared.ts';
 import { CallAudio, Ringer } from './audio.ts';
 import { trayIcons } from './icons.ts';
 import { icon, stateIcon } from './ui-icons.ts';
@@ -36,6 +36,11 @@ let autoTimer: ReturnType<typeof setTimeout> | undefined;
 let autoAt = 0;
 let lastMessageAt = 0;
 let platform = '';
+/** Home (calls, decisions, sessions) or Settings (where calls go, voice, this app). */
+let tab: 'home' | 'settings' = 'home';
+/** Session cards opened to their full summary, and whether finished sessions from earlier are shown. */
+const expanded = new Set<string>();
+let showEarlier = false;
 /** Unsent replies to waiting sessions, by pending id (the panel re-renders on every hub update). */
 const drafts = new Map<string, string>();
 const ringer = new Ringer();
@@ -110,6 +115,7 @@ function onMessage(m: HubToApp) {
     case 'call.incoming':
       if (!local) {
         local = { callId: m.callId, state: 'ringing', muted: false };
+        tab = 'home';
         ringer.start();
         armAutoAnswer();
       }
@@ -320,10 +326,10 @@ function callCard(): string {
       <p class="muted clip">${esc(snapshot.call.title)}</p></div></section>`;
   }
   const on = link === 'online';
-  return `<section class="hero">
+  return `<section class="hero row">
     <button class="callbtn" data-a="talk" ${on ? '' : 'disabled'} title="Talk to Claude">${icon('phone')}</button>
-    <h2>Talk to Claude</h2>
-    <p class="muted">${on ? "Uses this computer's microphone" : 'Waiting for the hub…'}</p>
+    <div class="grow"><h2>Talk to Claude</h2>
+    <p class="muted">${on ? "Ask what your sessions are doing, or give them a task. Uses this computer's microphone." : 'Waiting for the hub…'}</p></div>
   </section>`;
 }
 
@@ -360,7 +366,8 @@ function pendingCard(p: PendingCard): string {
       <div class="grow"><div class="row between"><h3 class="clip">${esc(p.project)}${p.background ? BG : ''}</h3>
       <span class="riskpill ${risky ? 'hot' : ''}">${ask ? esc(p.risk.toUpperCase()) : 'QUESTION'}</span></div></div>
     </div>
-    <p class="summary">${esc(p.summary)}</p>`;
+    <p class="summary">${esc(p.summary)}</p>
+    <p class="muted left" title="If nobody answers, the decision goes back to the computer.">${icon('clock')}Waits ${timeLeft(p.deadline)} more</p>`;
   // A waiting session asked something or finished: it needs words, not a yes (a bare "Approved, go ahead." answers nothing).
   if (!ask) {
     return `${head}
@@ -381,7 +388,8 @@ function pendingCard(p: PendingCard): string {
 }
 
 function sessionCard(s: SessionCard): string {
-  return `<section class="card session">
+  const open = expanded.has(s.id);
+  return `<section class="card session ${open ? 'open' : ''}" data-a="expand" data-id="${esc(s.id)}" title="${open ? 'Show less' : 'Show the whole summary'}">
     <div class="row">
       <span class="sticon st-${s.state}">${stateIcon(s.state)}</span>
       <b class="grow clip">${esc(s.project)}${s.background ? BG : ''}</b>
@@ -392,9 +400,9 @@ function sessionCard(s: SessionCard): string {
   </section>`;
 }
 
-function tiles<T extends string>(name: string, opts: Array<{ id: T; label: string; hint: string }>, icons: Record<string, string>, current: T | undefined, enabled: boolean) {
+function tiles<T extends string>(name: string, opts: Array<{ id: T; label: string; hint: string }>, icons: Record<string, string>, current: T | undefined, enabled: boolean, compact = false) {
   const cur = opts.find((o) => o.id === current);
-  return `<div class="tiles">${opts
+  return `<div class="tiles ${compact ? 'compact' : ''}">${opts
     .map(
       (o) =>
         `<button class="${o.id === current ? 'on' : ''}" data-a="${name}" data-v="${o.id}" ${enabled ? '' : 'disabled'}>${icon(icons[o.id])}<span>${esc(o.label)}</span></button>`,
@@ -433,31 +441,36 @@ function sendReply(id: string) {
   send({ type: 'pending.resolve', pendingId: id, decision: 'approve', note: text });
 }
 
-function renderPanel() {
-  const s = snapshot;
-  const online = link === 'online' && !!s;
-  const closeBtn = platform === 'linux' ? '' : `<button class="icon" data-a="hide" title="Close">${icon('x')}</button>`;
-  const status = online ? 'Connected' : link === 'setup' ? 'Not set up' : 'Offline';
-  $('#app').innerHTML = `
-    <header class="row between">
-      <div class="row brand"><img class="logo" src="../icon.png" alt=""><h1>CallMeClaude</h1></div>
-      <div class="row"><span class="pill ${online ? 'on' : 'off'}"><i></i>${status}</span>${closeBtn}</div>
-    </header>
-    <main>
-      ${notice ? `<div class="notice row">${icon('info')}<span class="grow">${esc(notice)}</span><button class="link" data-a="dismiss">OK</button></div>` : ''}
+function sessionList(s: Snapshot | undefined, online: boolean): string {
+  if (!s?.sessions.length) return `<section class="card"><p class="muted">${online ? 'No open Claude Code sessions.' : 'Waiting for the hub…'}</p></section>`;
+  const { recent, earlier } = orderSessions(s.sessions);
+  const more = earlier.length
+    ? `<button class="link more" data-a="earlier">${icon(showEarlier ? 'chevronUp' : 'chevronDown')}${showEarlier ? 'Hide earlier' : `Earlier (${earlier.length})`}</button>`
+    : '';
+  return recent.map(sessionCard).join('') + more + (showEarlier ? earlier.map(sessionCard).join('') : '');
+}
+
+function homeTab(s: Snapshot | undefined, online: boolean): string {
+  return `
       ${online ? '' : offlineCard()}
       ${callCard()}
       ${s?.paused ? `<section class="card warn row"><span class="badge orange">${icon('pause')}</span><div class="grow"><h3>Automation paused</h3><p class="muted">Nothing is approved or held automatically.</p></div><button class="btn small" data-a="resume">Resume</button></section>` : ''}
       ${s?.pending.length ? section('Needs your decision', s.pending.length) + s.pending.map(pendingCard).join('') : ''}
+      ${section('Mode')}
+      ${tiles('mode', MODES, MODE_ICON, s?.mode, online, true)}
+      ${section('Sessions', s?.sessions.length)}
+      ${sessionList(s, online)}
+      <button class="btn danger wide" data-a="panic" ${online && !s?.paused ? '' : 'disabled'}>${icon('octagonX')}${confirmPanic ? 'Click again: interrupt all sessions and pause' : 'Stop everything'}</button>`;
+}
+
+function settingsTab(s: Snapshot | undefined, online: boolean): string {
+  return `
+      ${online ? '' : offlineCard()}
       ${section('When Claude needs you')}
       ${tiles('ring', RING_TARGETS, RING_ICON, s?.ringTarget, online)}
       ${section('When a session finishes')}
       ${tiles('alert', DONE_ALERTS, ALERT_ICON, s?.doneAlert, online && !!s?.doneAlert)}
-      ${section('Mode')}
-      ${tiles('mode', MODES, MODE_ICON, s?.mode, online)}
-      ${section('Sessions', s?.sessions.length)}
-      ${s?.sessions.length ? s.sessions.map(sessionCard).join('') : `<section class="card"><p class="muted">${online ? 'No open Claude Code sessions.' : 'Waiting for the hub…'}</p></section>`}
-      ${section('Settings')}
+      ${section('Voice and this app')}
       <section class="card settings">
         <label class="row setting">${icon('globe')}<span class="grow">Voice language</span>
           <select data-a="language" ${online ? '' : 'disabled'}>${LANGUAGES.map(([c, n]) => `<option value="${c}" ${s?.language === c ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select>
@@ -465,8 +478,29 @@ function renderPanel() {
         <label class="row setting" title="Calls to this computer are picked up after ${AUTO_ANSWER_MS / 1000} seconds of ringing. You can still decline.">${icon('phone')}<span class="grow">Answer calls automatically</span><input type="checkbox" class="switch" data-a="autoanswer" ${autoAnswer ? 'checked' : ''}></label>
         <label class="row setting">${icon('power')}<span class="grow">Start at login</span><input type="checkbox" class="switch" data-a="login" ${loginItem ? 'checked' : ''}></label>
       </section>
-      <button class="btn danger wide" data-a="panic" ${online && !s?.paused ? '' : 'disabled'}>${icon('octagonX')}${confirmPanic ? 'Click again: interrupt all sessions and pause' : 'Stop everything'}</button>
-      <p class="foot"><button class="link" data-a="repo">${icon('code')}Source code (MIT)</button>${s ? ` · hub ${esc(s.hubVersion)}` : ''}</p>
+      <p class="foot"><button class="link" data-a="repo">${icon('code')}Source code (MIT)</button>${s ? ` · hub ${esc(s.hubVersion)}` : ''}</p>`;
+}
+
+function renderPanel() {
+  const s = snapshot;
+  const online = link === 'online' && !!s;
+  const closeBtn = platform === 'linux' ? '' : `<button class="icon" data-a="hide" title="Close (Esc)">${icon('x')}</button>`;
+  const status = online ? 'Connected' : link === 'setup' ? 'Not set up' : 'Offline';
+  const waiting = s?.pending.length ?? 0;
+  $('#app').innerHTML = `
+    <header>
+      <div class="row between">
+        <div class="row brand"><img class="logo" src="../icon.png" alt=""><h1>CallMeClaude</h1></div>
+        <div class="row"><span class="pill ${online ? 'on' : 'off'}"><i></i>${status}</span>${closeBtn}</div>
+      </div>
+      <nav class="tabs">
+        <button class="${tab === 'home' ? 'on' : ''}" data-a="tab" data-v="home">${icon('home')}Home${waiting ? `<span class="dot">${waiting}</span>` : ''}</button>
+        <button class="${tab === 'settings' ? 'on' : ''}" data-a="tab" data-v="settings">${icon('settings')}Settings</button>
+      </nav>
+    </header>
+    <main>
+      ${notice ? `<div class="notice row">${icon('info')}<span class="grow">${esc(notice)}</span><button class="link" data-a="dismiss">OK</button></div>` : ''}
+      ${tab === 'home' ? homeTab(s, online) : settingsTab(s, online)}
     </main>`;
 }
 
@@ -511,6 +545,18 @@ document.addEventListener('click', (e) => {
       return render();
     case 'hide':
       return cmc.hide();
+    case 'tab':
+      tab = el.dataset.v as typeof tab;
+      render();
+      return void (document.querySelector('main')!.scrollTop = 0);
+    case 'earlier':
+      showEarlier = !showEarlier;
+      return render();
+    case 'expand':
+      // Selecting text in a summary is not a click on the card.
+      if (window.getSelection()?.toString()) return;
+      if (!expanded.delete(el.dataset.id!)) expanded.add(el.dataset.id!);
+      return render();
     case 'repo':
       return cmc.openRepo();
   }
