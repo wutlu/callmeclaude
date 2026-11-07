@@ -17,6 +17,8 @@
   <a href="README.md">English</a>
 </p>
 
+<p align="center"><a href="docs/media/callmeclaude-demo.mp4"><b>▶ 30 saniyelik tanıtım videosu</b></a></p>
+
 ---
 
 Claude Code saatlerce kendi başına çalışabiliyor, ama bir izin istediğinde, *"bu formu senin onayın olmadan gönderemem"* dediğinde ya da işi bitirip yeni talimat beklediğinde durup seni bekliyor. Her seferinde klavyeye dönmen gerekiyor.

@@ -17,6 +17,8 @@
   <a href="README.tr.md">Türkçe</a>
 </p>
 
+<p align="center"><a href="docs/media/callmeclaude-demo.mp4"><b>▶ Watch the 30-second demo</b></a></p>
+
 ---
 
 Claude Code can work for hours on its own, until it stops to ask for a permission, says *"I can't submit this form without your approval"*, or finishes and waits for the next instruction. Each time, you have to go back to the keyboard.
