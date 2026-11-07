@@ -17,7 +17,7 @@
   <a href="README.tr.md">Türkçe</a>
 </p>
 
-<p align="center"><a href="docs/media/callmeclaude-demo.mp4"><b>▶ Watch the 30-second demo</b></a></p>
+<p align="center"><a href="docs/media/callmeclaude-demo.mp4"><img src="docs/media/callmeclaude-demo.gif" width="720" alt="CallMeClaude demo: a stuck Claude Code session rings the phone, the developer answers by voice, the session continues"></a><br><a href="docs/media/callmeclaude-demo.mp4">▶ Watch the 30-second demo (MP4)</a></p>
 
 ---
 

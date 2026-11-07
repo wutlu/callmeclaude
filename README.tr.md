@@ -17,7 +17,7 @@
   <a href="README.md">English</a>
 </p>
 
-<p align="center"><a href="docs/media/callmeclaude-demo.mp4"><b>▶ 30 saniyelik tanıtım videosu</b></a></p>
+<p align="center"><a href="docs/media/callmeclaude-demo.mp4"><img src="docs/media/callmeclaude-demo.gif" width="720" alt="CallMeClaude tanıtımı: takılan Claude Code oturumu telefonu arıyor, geliştirici sesle cevaplıyor, oturum devam ediyor"></a><br><a href="docs/media/callmeclaude-demo.mp4">▶ 30 saniyelik tanıtım videosu (MP4)</a></p>
 
 ---
 
