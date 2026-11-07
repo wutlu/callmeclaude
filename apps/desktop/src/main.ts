@@ -93,7 +93,12 @@ function createWindow() {
     frame: isLinux,
     skipTaskbar: !isLinux,
     title: 'CallMeClaude',
-    backgroundColor: '#121214',
+    // Slightly see-through, like a macOS popover (frosted glass); Linux keeps a solid window (compositors differ).
+    ...(isMac
+      ? { transparent: true, vibrancy: 'popover' as const, visualEffectState: 'active' as const, backgroundColor: '#00000000' }
+      : process.platform === 'win32'
+        ? { backgroundMaterial: 'acrylic' as const, backgroundColor: '#00000000' }
+        : { backgroundColor: '#121214' }),
     icon: join(__dirname, 'icon.png'),
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),

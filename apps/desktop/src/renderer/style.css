@@ -14,6 +14,8 @@
   --red: #ff453a;
   --blue: #0a84ff;
   --gray: #8e8e93;
+  --glass: rgba(18, 18, 20, 0.72);
+  --glass2: rgba(25, 25, 28, 0.66);
 }
 @media (prefers-color-scheme: light) {
   :root {
@@ -26,6 +28,8 @@
     --text: #1c1c1e;
     --muted: #6e6e73;
     --faint: #9a9aa0;
+    --glass: rgba(242, 242, 247, 0.72);
+    --glass2: rgba(233, 233, 239, 0.66);
   }
 }
 * { box-sizing: border-box; }
@@ -39,6 +43,9 @@ body {
 }
 body:not(.os-linux) #app { border: 1px solid var(--stroke); }
 #app { height: 100%; display: flex; flex-direction: column; overflow: hidden; background: linear-gradient(180deg, var(--bg2), var(--bg) 220px); }
+/* macOS and Windows: the window blurs what is behind it; let some of it show through. */
+body.os-darwin, body.os-win32 { background: transparent; }
+body.os-darwin #app, body.os-win32 #app { background: linear-gradient(180deg, var(--glass2), var(--glass) 220px); border-radius: 10px; }
 
 /* icons */
 .i { width: 16px; height: 16px; flex: none; display: inline-block; vertical-align: -3px; }

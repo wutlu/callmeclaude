@@ -293,7 +293,7 @@ export class VoiceCall {
     const quiet = Date.now() - this.lastActivity;
     if (quiet > 25_000 && !this.silencePrompted) {
       this.silencePrompted = true;
-      this.send('[SYSTEM] The developer has been silent for a while. Briefly ask whether they are still there.');
+      this.send('[SYSTEM] The developer has been silent for a while. Check casually whether they are still on the line, in a few natural words, like a friend would. If they answer yes, say in one sentence what is happening right now (or that nothing is waiting), not a generic "I\'m keeping track".');
     } else if (quiet > 50_000 && this.silencePrompted) {
       this.end('silence');
     }
