@@ -36,6 +36,17 @@ export interface CallInfo {
   title: string;
 }
 
+export type SubagentState = 'running' | 'done';
+
+export interface SubagentCard {
+  id: string;
+  /** Agent type from Claude Code, e.g. "Explore" or a custom agent name. */
+  type: string;
+  state: SubagentState;
+  /** What the subagent reported when it finished. */
+  summary?: string;
+}
+
 export interface SessionCard {
   id: string;
   project: string;
@@ -47,6 +58,8 @@ export interface SessionCard {
   controllable: Array<'hold' | 'tmux' | 'resume' | 'queue'>;
   /** Runs headless with no window (a background copy or a resumed session): nobody can type into it. */
   background?: boolean;
+  /** Subagents this session has spawned, running first. Absent when there are none. */
+  subagents?: SubagentCard[];
 }
 
 export interface PendingCard {

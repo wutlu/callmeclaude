@@ -164,6 +164,32 @@ test('full permission mode: ordinary tools pass PreToolUse, a critical one is tu
   assert.equal(plan.hookSpecificOutput, undefined);
 });
 
+test('subagents are tracked under their parent session', async () => {
+  await hook('SessionStart', { session_id: 's9', cwd: '/x/sub', source: 'startup' });
+  await hook('SubagentStart', { session_id: 's9', cwd: '/x/sub', agent_id: 'a1', agent_type: 'Explore' });
+  let card: any = hub.st.snapshot().sessions.find((x: any) => x.id === 's9');
+  assert.deepEqual(card.subagents, [{ id: 'a1', type: 'Explore', state: 'running' }]);
+
+  await hook('SubagentStop', {
+    session_id: 's9',
+    cwd: '/x/sub',
+    agent_id: 'a1',
+    agent_type: 'Explore',
+    agent_transcript_path: '/tmp/a1.jsonl',
+    last_assistant_message: 'Found 3 issues in the API layer.',
+  });
+  card = hub.st.snapshot().sessions.find((x: any) => x.id === 's9');
+  assert.deepEqual(card.subagents, [{ id: 'a1', type: 'Explore', state: 'done', summary: 'Found 3 issues in the API layer.' }]);
+
+  // Internal agents (prompt suggestions, /btw) report an empty type and stay hidden.
+  await hook('SubagentStart', { session_id: 's9', cwd: '/x/sub', agent_id: 'a2', agent_type: '' });
+  assert.equal(hub.st.sessions.get('s9').subagents.length, 1);
+
+  // Tool events inside a subagent must not be mistaken for parent activity.
+  await hook('PreToolUse', { session_id: 's9', cwd: '/x/sub', agent_id: 'a1', agent_type: 'Explore', tool_name: 'Grep', tool_input: {} });
+  assert.equal(hub.st.sessions.get('s9').openTool, undefined);
+});
+
 test('permission request ("ask" mode): auto-approve rule, then held + approved', async () => {
   hub.cfg.approvals = 'ask';
   after(() => delete hub.cfg.approvals);

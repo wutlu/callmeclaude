@@ -14,7 +14,7 @@ import { hooksInstalled, installHooks, installService, restartService, uninstall
 import { platform, SecretStoreError } from './platform/index.ts';
 import type { DoctorResult } from './platform/types.ts';
 import { onPath } from './platform/linux.ts';
-import { execFileP } from './util.ts';
+import { clip, execFileP } from './util.ts';
 import { hubUrls, lanIps, mdnsName, tailscaleInfo } from './addresses.ts';
 import { apnsConfigured, apnsTexts } from './apns.ts';
 import { doctorLine, geminiKeySavedText, helpText, pairTexts, projectRootsResult, voipTokenTexts } from './cliTexts.ts';
@@ -184,7 +184,11 @@ async function main() {
         const r = await api('status');
         const s = r.snapshot;
         console.log(`Mode: ${s.mode}${s.paused ? ' (PAUSED)' : ''} · call: ${r.voiceActive ? 'active' : r.ringing ? 'ringing' : 'none'} · queued: ${r.queued} · language: ${s.language}`);
-        for (const x of s.sessions) console.log(`  ${x.state.padEnd(18)} ${x.project.padEnd(28)} ${x.summary}`);
+        for (const x of s.sessions) {
+          console.log(`  ${x.state.padEnd(18)} ${x.project.padEnd(28)} ${x.summary}`);
+          for (const a of x.subagents ?? [])
+            console.log(`      ↳ ${a.type}${a.state === 'running' ? ' · working' : ' · done'}${a.summary ? ` — ${clip(a.summary, 100)}` : ''}`);
+        }
         if (s.pending.length) console.log('Pending decisions:');
         for (const p of s.pending) console.log(`  [${p.risk}] ${p.project}: ${p.summary}`);
       } catch {

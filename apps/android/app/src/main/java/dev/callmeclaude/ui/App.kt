@@ -380,6 +380,29 @@ private fun SessionCardView(s: SessionCard) {
             maxLines = if (open) Int.MAX_VALUE else 3,
             overflow = TextOverflow.Ellipsis,
         )
+        if (s.subagents.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                s.subagents.take(6).forEach { a ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Dot(if (a.state == "running") Palette.accent else Palette.gray, 6)
+                        Spacer(Modifier.width(6.dp))
+                        Text(a.type, style = MaterialTheme.typography.labelMedium)
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (a.state == "running") "working" else "done", style = MaterialTheme.typography.labelSmall, color = Palette.gray)
+                        a.summary?.let {
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Palette.gray,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
         Text(relative(s.updatedAt), style = MaterialTheme.typography.labelSmall, color = Palette.gray)
     }
 }

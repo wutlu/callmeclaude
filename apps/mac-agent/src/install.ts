@@ -12,6 +12,8 @@ const EVENTS: Array<[string, 'short' | 'hold' | 'tool']> = [
   ['SessionEnd', 'short'],
   ['UserPromptSubmit', 'short'],
   ['Notification', 'short'],
+  ['SubagentStart', 'short'],
+  ['SubagentStop', 'short'],
   ['PreToolUse', 'tool'],
   ['PostToolUse', 'tool'],
   ['StopFailure', 'short'],

@@ -101,7 +101,8 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
   const watchOnly = isIgnored(hub.cfg.ignorePaths, input.cwd);
   const base: Partial<Session> = { transcriptPath: input.transcript_path ?? '' };
   if (pane) base.tmuxPane = pane;
-  if (input.agent_id) return send({}); // subagent-level events: ignore, the main thread reports
+  if (event === 'SubagentStart' || event === 'SubagentStop') return onSubagent(hub, event, input, base, send);
+  if (input.agent_id) return send({}); // other subagent-level events: ignore, the main thread reports
 
   switch (event) {
     case 'SessionStart': {
@@ -133,6 +134,7 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
     }
     case 'SessionEnd': {
       const s = st.upsertSession(sid, input.cwd, { ...base, state: 'ended', summary: 'Session closed.' });
+      st.endSubagents(s);
       hub.controller.release(s);
       return send({});
     }
@@ -163,6 +165,30 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
     default:
       return send({});
   }
+}
+
+/** Track Claude Code subagents under their parent session (the main thread keeps reporting too). */
+function onSubagent(hub: Hub, event: 'SubagentStart' | 'SubagentStop', input: Json, base: Partial<Session>, send: (b: object) => void) {
+  const { st } = hub;
+  const type = String(input.agent_type ?? '').trim();
+  const agentId = String(input.agent_id ?? '').trim();
+  // Claude Code runs internal agents too (prompt suggestions, /btw); they report no agent type.
+  if (!type || !agentId) return send({});
+  const s = st.upsertSession(input.session_id, input.cwd, event === 'SubagentStart' ? { ...base, state: 'running' } : base);
+  if (event === 'SubagentStart') {
+    st.upsertSubagent(s.id, input.cwd, agentId, { type, state: 'running' });
+    audit('subagent.start', { session: s.id, agent: agentId, type });
+  } else {
+    const msg = String(input.last_assistant_message ?? '').replace(/\s+/g, ' ').trim();
+    st.upsertSubagent(s.id, input.cwd, agentId, {
+      type,
+      state: 'done',
+      ...(msg ? { summary: clip(msg, 160) } : {}),
+      ...(input.agent_transcript_path ? { transcriptPath: String(input.agent_transcript_path) } : {}),
+    });
+    audit('subagent.stop', { session: s.id, agent: agentId, type });
+  }
+  return send({});
 }
 
 /** Deliver instructions queued while the session was busy, as additional context. */

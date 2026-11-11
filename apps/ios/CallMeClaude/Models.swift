@@ -9,6 +9,13 @@ struct PairingInfo: Codable, Equatable {
     var token: String
 }
 
+struct SubagentCard: Codable, Identifiable, Equatable {
+    var id: String
+    var type: String
+    var state: String
+    var summary: String?
+}
+
 struct SessionCard: Codable, Identifiable, Equatable {
     var id: String
     var project: String
@@ -16,6 +23,7 @@ struct SessionCard: Codable, Identifiable, Equatable {
     var state: String
     var summary: String
     var updatedAt: String
+    var subagents: [SubagentCard]?
 }
 
 struct PendingCard: Codable, Identifiable, Equatable {

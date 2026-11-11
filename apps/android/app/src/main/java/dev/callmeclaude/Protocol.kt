@@ -57,6 +57,13 @@ sealed interface PairingResult {
     data class Invalid(val message: String) : PairingResult
 }
 
+data class SubagentCard(
+    val id: String,
+    val type: String,
+    val state: String,
+    val summary: String?,
+)
+
 data class SessionCard(
     val id: String,
     val project: String,
@@ -64,6 +71,7 @@ data class SessionCard(
     val state: String,
     val summary: String,
     val updatedAt: String,
+    val subagents: List<SubagentCard>,
 )
 
 data class PendingCard(
@@ -102,6 +110,14 @@ data class Snapshot(
                     state = it.optString("state"),
                     summary = it.optString("summary"),
                     updatedAt = it.optString("updatedAt"),
+                    subagents = it.optJSONArray("subagents").objects().map { a ->
+                        SubagentCard(
+                            id = a.getString("id"),
+                            type = a.optString("type", "agent"),
+                            state = a.optString("state", "running"),
+                            summary = a.optString("summary").ifEmpty { null },
+                        )
+                    },
                 )
             },
             pending = o.optJSONArray("pending").objects().map {

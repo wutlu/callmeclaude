@@ -138,10 +138,11 @@ export class Hub {
       if (s.tmuxPane && !panes.has(s.tmuxPane) && !this.st.holdForSession(s.id)) {
         s.state = 'ended';
         s.summary = 'Session closed.';
+        this.st.endSubagents(s);
         this.st.changed();
         continue;
       }
-      if (s.state !== 'running') continue;
+      if (s.state !== 'running' || (s.subagents ?? []).some((a) => a.state === 'running')) continue;
       const idleMin = (now - Date.parse(s.updatedAt)) / 60000;
       if (idleMin > 20) {
         s.state = 'stale';

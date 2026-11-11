@@ -34,6 +34,9 @@
 | `error` | `message` | |
 | `announce` | `text`, `language` | Yalnızca telefonlara, `doneAlert: "phone"` iken: metni cihazın kendi sesiyle `language` dilinde oku |
 
+`snapshot.sessions[]` kartları, ana oturumun başlattığı alt ajanları `subagents` (opsiyonel) alanında taşır:
+`{ id, type, state: "running" | "done", summary? }`. Çalışanlar önce gelir; bitenler kısa bir süre görünür kalır.
+
 ## VoIP push (APNs, `apns-push-type: voip`, topic `<bundle>.voip`)
 ```json
 { "cmc": { "v": 1, "callId": "c_ab12cd", "title": "acme: engel", "priority": "P1" } }

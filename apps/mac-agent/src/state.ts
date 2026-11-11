@@ -7,6 +7,16 @@ import { log, plainText } from './util.ts';
 
 export const HUB_VERSION = '0.1.0';
 
+export interface Subagent {
+  id: string;
+  type: string;
+  state: 'running' | 'done';
+  summary?: string;
+  transcriptPath?: string;
+  startedAt: string;
+  updatedAt: string;
+}
+
 export interface Session {
   id: string;
   project: string;
@@ -25,6 +35,7 @@ export interface Session {
   openTool?: string;
   /** Running as a headless `claude -p` the hub started (fork, resume or voice start): there is no window. */
   background?: boolean;
+  subagents?: Subagent[];
 }
 
 export interface Pending {
@@ -53,6 +64,11 @@ export interface Hold {
 }
 
 const nameCache = new Map<string, string>();
+
+/** Finished subagents stay visible for a while; long sessions don't accumulate them forever. */
+const SUBAGENT_TTL_MS = 60 * 60e3;
+const MAX_SUBAGENTS = 20;
+const MAX_SUBAGENTS_IN_CARD = 8;
 
 /** Project name = the git repository root's folder name (so sub-folders map to their project). */
 export function projectName(cwd: string) {
@@ -156,6 +172,40 @@ export class State extends EventEmitter {
     }
     this.changed();
     return s;
+  }
+
+  /** Track a subagent Claude spawned inside a session. */
+  upsertSubagent(sessionId: string, cwd: string, id: string, patch: Partial<Subagent> = {}): Session {
+    const now = new Date().toISOString();
+    const s = this.upsertSession(sessionId, cwd);
+    let a = s.subagents?.find((x) => x.id === id);
+    if (!a) {
+      a = { id, type: patch.type || 'agent', state: 'running', startedAt: now, updatedAt: now };
+      (s.subagents ??= []).push(a);
+    }
+    Object.assign(a, patch, { updatedAt: now });
+    if (!a.type) a.type = 'agent';
+    if (s.subagents) {
+      s.subagents.sort((x, y) => (x.state === y.state ? y.updatedAt.localeCompare(x.updatedAt) : x.state === 'running' ? -1 : 1));
+      s.subagents = s.subagents
+        .filter((x) => x.state === 'running' || Date.parse(x.updatedAt) > Date.now() - SUBAGENT_TTL_MS)
+        .slice(0, MAX_SUBAGENTS);
+    }
+    this.changed();
+    return s;
+  }
+
+  /** A closing session takes its running subagents with it. */
+  endSubagents(s: Session) {
+    let touched = false;
+    for (const a of s.subagents ?? []) {
+      if (a.state === 'running') {
+        a.state = 'done';
+        a.updatedAt = new Date().toISOString();
+        touched = true;
+      }
+    }
+    if (touched) this.changed();
   }
 
   /** Remember that the developer wants a call when this session (or the next session in `dir`) stops. */
@@ -262,6 +312,10 @@ const toCard =
     if (st.holdForSession(s.id)) c.push('hold');
     if (s.tmuxPane) c.push('tmux');
     c.push('queue');
+    const subagents = s.subagents
+      ?.filter((a) => a.state === 'running' || Date.parse(a.updatedAt) > Date.now() - SUBAGENT_TTL_MS)
+      .slice(0, MAX_SUBAGENTS_IN_CARD)
+      .map((a) => ({ id: a.id, type: a.type, state: a.state, ...(a.summary ? { summary: a.summary } : {}) }));
     return {
       id: s.id,
       project: s.project,
@@ -271,6 +325,7 @@ const toCard =
       updatedAt: s.updatedAt,
       controllable: c,
       ...(s.background ? { background: true } : {}),
+      ...(subagents?.length ? { subagents } : {}),
     };
   };
 
