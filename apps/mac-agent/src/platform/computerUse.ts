@@ -380,6 +380,7 @@ export function packageManager(osRelease: string): PackageManager | undefined {
 const PACKAGE: Record<string, Partial<Record<PackageManager, string>>> = {
   spectacle: { apt: 'kde-spectacle', dnf: 'spectacle', pacman: 'spectacle' },
   import: { apt: 'imagemagick', dnf: 'ImageMagick', pacman: 'imagemagick' },
+  avahi: { apt: 'avahi-daemon', dnf: 'avahi', pacman: 'avahi' },
 };
 
 export function installCommand(pm: PackageManager | undefined, tools: string[]) {
