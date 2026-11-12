@@ -164,6 +164,52 @@ test('full permission mode: ordinary tools pass PreToolUse, a critical one is tu
   assert.equal(plan.hookSpecificOutput, undefined);
 });
 
+test('subagents are tracked under their parent session', async () => {
+  await hook('SessionStart', { session_id: 's9', cwd: '/x/sub', source: 'startup' });
+  await hook('SubagentStart', { session_id: 's9', cwd: '/x/sub', agent_id: 'a1', agent_type: 'Explore' });
+  let card: any = hub.st.snapshot().sessions.find((x: any) => x.id === 's9');
+  assert.deepEqual(card.subagents, [{ id: 'a1', type: 'Explore', state: 'running' }]);
+
+  await hook('SubagentStop', {
+    session_id: 's9',
+    cwd: '/x/sub',
+    agent_id: 'a1',
+    agent_type: 'Explore',
+    agent_transcript_path: '/tmp/a1.jsonl',
+    last_assistant_message: 'Found 3 issues in the API layer.',
+  });
+  card = hub.st.snapshot().sessions.find((x: any) => x.id === 's9');
+  assert.deepEqual(card.subagents, [{ id: 'a1', type: 'Explore', state: 'done', summary: 'Found 3 issues in the API layer.' }]);
+
+  // Internal agents (prompt suggestions, /btw) report an empty type and stay hidden.
+  await hook('SubagentStart', { session_id: 's9', cwd: '/x/sub', agent_id: 'a2', agent_type: '' });
+  assert.equal(hub.st.sessions.get('s9').subagents.length, 1);
+
+  // Tool events inside a subagent must not be mistaken for parent activity.
+  await hook('PreToolUse', { session_id: 's9', cwd: '/x/sub', agent_id: 'a1', agent_type: 'Explore', tool_name: 'Grep', tool_input: {} });
+  assert.equal(hub.st.sessions.get('s9').openTool, undefined);
+});
+
+test('subagents: summaries are cleaned for the phone, and a silent "running" one is given up on', async () => {
+  const { SUBAGENT_SILENT_MS } = await import('../src/state.ts');
+  await hook('SubagentStart', { session_id: 's10', cwd: '/x/sub2', agent_id: 'b1', agent_type: 'Explore' });
+  await hook('SubagentStop', { session_id: 's10', cwd: '/x/sub2', agent_id: 'b1', agent_type: 'Explore', last_assistant_message: '**Done**: key is ghp_abcdefghijklmnopqrstuvwxyz0123456789' });
+  const card: any = hub.st.snapshot().sessions.find((x: any) => x.id === 's10');
+  assert.equal(card.subagents[0].summary, 'Done: key is [redacted]');
+
+  // SubagentStop never arrives (session killed, hub restarted): tool events keep it alive, silence ends it.
+  await hook('SubagentStart', { session_id: 's10', cwd: '/x/sub2', agent_id: 'b2', agent_type: 'Plan' });
+  const s = hub.st.sessions.get('s10');
+  const b2 = s.subagents.find((a: any) => a.id === 'b2');
+  b2.updatedAt = new Date(Date.now() - SUBAGENT_SILENT_MS - 60_000).toISOString();
+  await hook('PreToolUse', { session_id: 's10', cwd: '/x/sub2', agent_id: 'b2', agent_type: 'Plan', tool_name: 'Grep', tool_input: {} });
+  hub.st.expireSubagents(s);
+  assert.equal(b2.state, 'running', 'a tool event counts as a sign of life');
+  b2.updatedAt = new Date(Date.now() - SUBAGENT_SILENT_MS - 60_000).toISOString();
+  hub.st.expireSubagents(s);
+  assert.equal(b2.state, 'done');
+});
+
 test('permission request ("ask" mode): auto-approve rule, then held + approved', async () => {
   hub.cfg.approvals = 'ask';
   after(() => delete hub.cfg.approvals);

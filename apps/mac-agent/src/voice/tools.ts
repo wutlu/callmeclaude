@@ -154,7 +154,16 @@ export async function runTool(hub: Hub, name: string, args: any, ctx: { endCall:
       const s = find(args.project);
       if (!s) return { error: 'No open session with that name.', sessions: projects() };
       const p = hub.st.openPending().find((x) => x.sessionId === s.id);
-      return { project: s.project, state: s.state, summary: s.summary, pending: p?.summary, last_message: redact(clip(s.lastMessage, 700)), last_instruction: clip(s.lastPrompt, 200) };
+      const subagents = (s.subagents ?? []).map((a) => ({ type: a.type, state: a.state }));
+      return {
+        project: s.project,
+        state: s.state,
+        summary: s.summary,
+        pending: p?.summary,
+        ...(subagents.length ? { subagents } : {}),
+        last_message: redact(clip(s.lastMessage, 700)),
+        last_instruction: clip(s.lastPrompt, 200),
+      };
     }
     case 'reply_to_session': {
       const s = find(args.project);

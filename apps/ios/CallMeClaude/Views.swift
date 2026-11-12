@@ -259,6 +259,23 @@ struct SessionCardView: View {
             }
             Text(s.summary).font(.callout).foregroundStyle(open ? .primary : .secondary).lineLimit(open ? nil : 3)
                 .textSelection(.enabled)
+            if let subs = s.subagents, !subs.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    ForEach(subs.prefix(6)) { a in
+                        HStack(spacing: 5) {
+                            Image(systemName: a.state == "running" ? "circle.dotted" : "checkmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundStyle(a.state == "running" ? Theme.accent : .secondary)
+                            Text(a.type).font(.caption.weight(.medium))
+                            Text(a.state == "running" ? "working" : "done")
+                                .font(.caption2).foregroundStyle(.secondary)
+                            if let summary = a.summary {
+                                Text(summary).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+                            }
+                        }
+                    }
+                }
+            }
             Text(relative(s.updatedAt)).font(.caption2).foregroundStyle(.secondary)
         }
         .contentShape(Rectangle())

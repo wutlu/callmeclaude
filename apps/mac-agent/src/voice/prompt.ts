@@ -76,6 +76,8 @@ export function briefing(hub: Hub, agenda: CallItem[] = []) {
   for (const s of ss.slice(0, 12)) {
     const ago = Math.round((Date.now() - Date.parse(s.updatedAt)) / 60000);
     lines.push(`- ${s.project}${s.background ? ' (background copy, no window)' : ''}: ${STATE_LABEL[s.state] ?? s.state} (${ago} min ago): ${s.summary}`);
+    const subs = (s.subagents ?? []).filter((a) => a.state === 'running').map((a) => a.type);
+    if (subs.length) lines.push(`  subagents working: ${subs.join(', ')}`);
   }
   if (pend.length) {
     lines.push('Pending decisions:');

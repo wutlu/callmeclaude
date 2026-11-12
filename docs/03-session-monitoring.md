@@ -21,6 +21,8 @@
     "Stop":              [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/hooks/Stop", "timeout": 600 }] }],
     "StopFailure":       [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/hooks/StopFailure", "timeout": 5 }] }],
     "PostToolUse":       [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/hooks/PostToolUse", "timeout": 3 }] }],
+    "SubagentStart":     [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/hooks/SubagentStart", "timeout": 5 }] }],
+    "SubagentStop":      [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/hooks/SubagentStop", "timeout": 5 }] }],
     "TaskCompleted":     [{ "hooks": [{ "type": "http", "url": "http://127.0.0.1:47800/hooks/TaskCompleted", "timeout": 5 }] }]
   }
 }
