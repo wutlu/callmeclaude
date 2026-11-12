@@ -84,6 +84,8 @@ data class Snapshot(
     val hubVersion: String,
     val sessions: List<SessionCard>,
     val pending: List<PendingCard>,
+    /** Where the hub rings: "computer", "phone" or "off"; null from older hubs (setting hidden). */
+    val ringTarget: String? = null,
     /** Spoken "task complete" alerts: "off", "computer" or "phone"; null from older hubs (no such setting). */
     val doneAlert: String? = null,
 ) {
@@ -93,6 +95,7 @@ data class Snapshot(
             language = o.optString("language").ifEmpty { null },
             paused = o.optBoolean("paused", false),
             hubVersion = o.optString("hubVersion"),
+            ringTarget = o.optString("ringTarget").ifEmpty { null },
             doneAlert = o.optString("doneAlert").ifEmpty { null },
             sessions = o.optJSONArray("sessions").objects().map {
                 SessionCard(
@@ -183,6 +186,7 @@ object AppMessages {
 
     fun modeSet(mode: String): String = JSONObject().put("type", "mode.set").put("mode", mode).toString()
     fun languageSet(code: String): String = JSONObject().put("type", "language.set").put("language", code).toString()
+    fun ringSet(target: String): String = JSONObject().put("type", "ring.set").put("target", target).toString()
     fun alertSet(target: String): String = JSONObject().put("type", "alert.set").put("target", target).toString()
     fun panic(): String = JSONObject().put("type", "panic").toString()
     fun resume(): String = JSONObject().put("type", "resume").toString()

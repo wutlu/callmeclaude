@@ -36,6 +36,8 @@ struct Snapshot: Codable, Equatable {
     var hubVersion: String
     var sessions: [SessionCard]
     var pending: [PendingCard]
+    /// Where the hub rings: "computer", "phone" or "off"; nil from older hubs.
+    var ringTarget: String?
     /// Spoken "task complete" alerts: "off", "computer" or "phone"; nil from older hubs.
     var doneAlert: String?
 }

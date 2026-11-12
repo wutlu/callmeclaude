@@ -39,6 +39,16 @@ import dev.callmeclaude.HubClient
 import dev.callmeclaude.warnings
 import java.util.Date
 
+/** Where the hub rings when a session needs you; same choices as "Call this computer / Call my phone / Don't call" on the desktop. */
+val ringTargets = listOf("phone" to "This phone", "computer" to "The computer", "off" to "Don't call")
+
+/** What the hub really does with each choice (calls.ts target()/enqueue()). */
+fun ringTargetHint(target: String): String? = when (target) {
+    "computer" -> "If the desktop app isn't open, this phone rings instead (in Desk mode nothing rings)."
+    "off" -> "Nothing rings. Updates wait until you start a conversation."
+    else -> null
+}
+
 /** Where the spoken "task complete" alert plays; same words as the desktop app and iOS. */
 val doneAlerts = listOf("phone" to "On this phone", "computer" to "On the computer", "off" to "Off")
 
@@ -63,6 +73,7 @@ fun SettingsScreen(hub: HubClient, onDone: () -> Unit) {
     val problems = warnings(health.health)
     var confirmUnpair by remember { mutableStateOf(false) }
     var languageMenu by remember { mutableStateOf(false) }
+    var ringMenu by remember { mutableStateOf(false) }
     var alertMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val uri = LocalUriHandler.current
@@ -131,6 +142,24 @@ fun SettingsScreen(hub: HubClient, onDone: () -> Unit) {
                 }
             }
             Footer("Claude speaks this language on calls and writes session summaries in it. Takes full effect from the next call.")
+
+            snapshot?.ringTarget?.let { current ->
+                SectionTitle("When Claude needs you")
+                Card {
+                    Box {
+                        Row(Modifier.fillMaxWidth().clickable { ringMenu = true }.padding(vertical = 4.dp)) {
+                            Text("Call", modifier = Modifier.weight(1f))
+                            Text(ringTargets.firstOrNull { it.first == current }?.second ?: current, color = Palette.accent)
+                        }
+                        DropdownMenu(expanded = ringMenu, onDismissRequest = { ringMenu = false }) {
+                            ringTargets.forEach { (id, name) ->
+                                DropdownMenuItem(text = { Text(name) }, onClick = { ringMenu = false; hub.setRingTarget(id) })
+                            }
+                        }
+                    }
+                }
+                ringTargetHint(current)?.let { Footer(it) }
+            }
 
             snapshot?.doneAlert?.let { current ->
                 SectionTitle("When a session finishes")
