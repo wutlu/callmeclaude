@@ -44,7 +44,7 @@ val ringTargets = listOf("phone" to "This phone", "computer" to "The computer", 
 
 /** What the hub really does with each choice (calls.ts target()/enqueue()). */
 fun ringTargetHint(target: String): String? = when (target) {
-    "computer" -> "If the desktop app isn't open on the computer, this phone rings instead."
+    "computer" -> "If the desktop app isn't open, this phone rings instead (in Desk mode nothing rings)."
     "off" -> "Nothing rings. Updates wait until you start a conversation."
     else -> null
 }

@@ -396,7 +396,7 @@ struct SettingsView: View {
                     } header: {
                         Text("When Claude needs you")
                     } footer: {
-                        Text(current == "computer" ? "If the desktop app isn't open on the Mac, this phone rings instead."
+                        Text(current == "computer" ? "If the desktop app isn't open on the Mac, this phone rings instead (in Desk mode nothing rings)."
                              : current == "off" ? "Nothing rings. Updates wait until you start a conversation." : "")
                     }
                 }
