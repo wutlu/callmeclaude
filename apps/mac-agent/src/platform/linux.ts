@@ -28,6 +28,17 @@ import {
 
 const UNIT_NAME = `${SERVICE_LABEL}.service`;
 
+/**
+ * Interfaces whose addresses are offered to the phone as LAN addresses. Tailscale has its own
+ * entries. Container and VM bridges (docker0, br-<id>, veth…, virbr…, podman…, lxcbr…, lxdbr…, cni…,
+ * vboxnet…, vmnet…) are private to this computer and the phone can never reach them. VPNs the
+ * phone may share (WireGuard wg…, ZeroTier zt…, tun…, tap…) stay: some use them instead of Tailscale.
+ * A plain "br0" stays too: that is usually the real LAN bridged for VMs. Pure.
+ */
+export function linuxLanInterface(name: string): boolean {
+  return !/^(tailscale|docker\d|br-|veth|virbr|podman|lxcbr|lxdbr|cni|vboxnet|vmnet)/.test(name);
+}
+
 /** The program `speak` uses, best first: speech-dispatcher, then espeak-ng / espeak. Pure. */
 export function speechTool(has: (bin: string) => boolean): 'spd-say' | 'espeak-ng' | 'espeak' | undefined {
   return (['spd-say', 'espeak-ng', 'espeak'] as const).find((b) => has(b));
@@ -459,7 +470,7 @@ export const linux: Platform = {
   shellExec: (command, opts) => execFileP(linuxShell(), ['-lc', command], { ...opts, encoding: 'utf8' }),
   servicePath: () => linuxServicePath(homedir(), process.execPath),
   tailscaleBins: ['tailscale'],
-  isLanInterface: (name) => !name.startsWith('tailscale'),
+  isLanInterface: (name) => linuxLanInterface(name),
   async speak(text, language) {
     const lang = language.split('-')[0];
     const bin = speechTool(onPath);
