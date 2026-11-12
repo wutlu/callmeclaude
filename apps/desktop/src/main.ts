@@ -1,10 +1,11 @@
 // CallMeClaude desktop: a tray app that is one more client of the local hub (like the phone app).
 // The renderer holds the hub WebSocket and the audio; this process owns the tray, the window and OS glue.
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, screen, session, shell, systemPreferences, Tray, type MenuItemConstructorOptions, type NativeImage } from 'electron';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { autostartEntry, DONE_ALERTS, hubDataDir, MODES, panelPosition, parseHubConfig, parseSettings, RING_TARGETS, stateLabel, trayLook, type DesktopSettings, type TrayTone, type View } from './shared.ts';
+import { autostartEntry, DONE_ALERTS, hasDbusName, hubDataDir, MODES, panelPosition, parseHubConfig, parseSettings, RING_TARGETS, showAtStart, stateLabel, trayLook, type DesktopSettings, type TrayTone, type View } from './shared.ts';
 
 const SIZE = { width: 380, height: 620 };
 const isMac = process.platform === 'darwin';
@@ -19,10 +20,34 @@ let quitting = false;
 const icons = new Map<TrayTone, NativeImage>();
 let lastRinging: string | undefined;
 let settings: DesktopSettings | undefined;
+/** Linux: false when the session has no tray (no StatusNotifierWatcher), so the panel must stay reachable. */
+let trayShown = true;
 
-// A screenshot run may happen next to the installed app, so it does not take the single-instance lock.
+// A screenshot run may happen next to the installed app, so it does not take the single-instance lock, and
+// it never touches the user's profile (settings, Chromium data): userData goes to a fresh directory under
+// $TMPDIR, left there (Chromium still writes to it while shutting down, after the app's last event).
+if (process.env.CMC_DESKTOP_SNAPSHOT) {
+  const dir = mkdtempSync(join(tmpdir(), 'cmc-desktop-smoke-'));
+  app.setPath('userData', dir);
+  console.log(`snapshot userData ${dir}`);
+}
 if (!process.env.CMC_DESKTOP_SNAPSHOT && !app.requestSingleInstanceLock()) app.quit();
 else start();
+
+/**
+ * Linux: is there a tray to put the icon in? Trays (KDE, AppIndicator on GNOME, …) own
+ * org.kde.StatusNotifierWatcher on the session bus. Unknown (no dbus-send / gdbus) counts as yes.
+ */
+function linuxTrayAvailable(): Promise<boolean> {
+  const ask = (bin: string, args: string[]) =>
+    new Promise<boolean | undefined>((done) =>
+      execFile(bin, args, { timeout: 2000 }, (err, stdout) => done(err && !stdout ? undefined : hasDbusName(stdout))),
+    );
+  const name = 'org.kde.StatusNotifierWatcher';
+  return ask('dbus-send', ['--session', '--print-reply', '--dest=org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus.NameHasOwner', `string:${name}`])
+    .then((r) => r ?? ask('gdbus', ['call', '--session', '--dest', 'org.freedesktop.DBus', '--object-path', '/org/freedesktop/DBus', '--method', 'org.freedesktop.DBus.NameHasOwner', name]))
+    .then((r) => r ?? true);
+}
 
 function start() {
   // Launching the app again (Dock, Start menu, app launcher) opens the panel of the running one.
@@ -32,13 +57,18 @@ function start() {
   // A tray app: closing the window does not quit.
   app.on('window-all-closed', () => {});
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     if (isMac) app.dock?.hide();
+    if (isLinux) {
+      trayShown = await linuxTrayAvailable();
+      if (!trayShown) console.log('tray: none (no StatusNotifierWatcher on the session bus), showing the panel');
+    }
     lockDown();
     createWindow();
     createTray();
     ipc();
-    if (!process.argv.includes('--hidden') && !app.getLoginItemSettings().wasOpenedAtLogin) win!.once('ready-to-show', () => showWindow());
+    const hidden = process.argv.includes('--hidden') || app.getLoginItemSettings().wasOpenedAtLogin;
+    if (showAtStart({ hidden, trayShown })) win!.once('ready-to-show', () => showWindow());
     // Smoke test / screenshots: render the panel, save it as PNG, quit (CMC_DESKTOP_SNAPSHOT=/path/out.png).
     const shot = process.env.CMC_DESKTOP_SNAPSHOT;
     if (shot) {
@@ -61,7 +91,7 @@ function start() {
               await new Promise((r) => setTimeout(r, 1000));
             }
           }
-          console.log(`snapshot ${shot} tray=${icons.size} link=${view.link}`);
+          console.log(`snapshot ${shot} tray=${icons.size} link=${view.link} panel=${win!.isVisible() ? 'shown' : 'hidden'}`);
           quitting = true;
           app.quit();
         }, Number(process.env.CMC_DESKTOP_SNAPSHOT_DELAY ?? 2500)),
@@ -114,7 +144,9 @@ function createWindow() {
   win.on('close', (e) => {
     if (!quitting) {
       e.preventDefault();
-      win!.hide();
+      // No tray to bring it back from (Linux): keep it in the taskbar instead of hiding it.
+      if (trayShown) win!.hide();
+      else win!.minimize();
     }
   });
   // A popover panel: clicking elsewhere hides it, unless a call is ringing or running here.

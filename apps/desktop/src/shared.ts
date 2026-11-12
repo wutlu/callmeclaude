@@ -143,6 +143,20 @@ export function panelPosition(tray: Rect, size: { width: number; height: number 
 }
 
 /** ~/.config/autostart entry that starts the app at login on Linux desktops (XDG autostart). */
+/**
+ * Open the panel at start? Not when asked to start hidden (login, `--hidden`), unless there is no tray to
+ * open it from (Linux without a StatusNotifierWatcher, e.g. GNOME without the AppIndicator extension).
+ */
+export function showAtStart(o: { hidden: boolean; trayShown: boolean }): boolean {
+  return !o.hidden || !o.trayShown;
+}
+
+/** The answer of org.freedesktop.DBus.NameHasOwner, from `dbus-send --print-reply` or `gdbus call`; undefined if unreadable. */
+export function hasDbusName(stdout: string): boolean | undefined {
+  const m = stdout.match(/boolean (true|false)|\((true|false),\)/);
+  return m ? (m[1] ?? m[2]) === 'true' : undefined;
+}
+
 export function autostartEntry(exec: string): string {
   const quoted = /[\s"'\\]/.test(exec) ? `"${exec.replace(/(["\\`$])/g, '\\$1')}"` : exec;
   return ['[Desktop Entry]', 'Type=Application', 'Name=CallMeClaude', `Exec=${quoted} --hidden`, 'X-GNOME-Autostart-enabled=true', 'Terminal=false', ''].join('\n');
