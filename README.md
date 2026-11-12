@@ -164,7 +164,7 @@ cmc doctor                                    # check the whole setup
 
 On the phone, tap **Call Claude**, or say *"Hey Siri, call CallMeClaude"*. On the computer, click the tray icon and press **Talk to Claude**.
 
-The tray icon also picks where Claude calls you when a session needs you:
+The tray icon, or **Settings › When Claude needs you** in the phone app, picks where Claude calls you when a session needs you:
 
 | Choice | What happens |
 |---|---|

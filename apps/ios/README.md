@@ -27,3 +27,5 @@ xcrun devicectl device install app --device <cihaz-id> build/Build/Products/Debu
 VoIP push için **ücretli Apple Developer hesabı** gerekir (Xcode'da hesabın ekli olmalı; `-allowProvisioningUpdates` push yetkili profili otomatik üretir). Xcode'dan kurulan sürüm APNs **sandbox** ortamını kullanır → Hub'da `apns.environment = development`.
 
 İlk açılışta: mikrofon, kamera (QR) ve yerel ağ izinlerini ver. Ayarlar → CallMeClaude → "Siri ve Arama" açık olsun.
+
+Aramanın nerede çalacağı uygulamanın Settings → **When Claude needs you** bölümünden seçilir: **This phone**, **The Mac** (masaüstü uygulaması çalar; açık değilse telefon çalar) ya da **Don't call**. Masaüstü uygulamasındaki ayarın aynısıdır.

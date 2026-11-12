@@ -160,7 +160,15 @@ cmc panic                                     # her şeyi durdur, otomasyonu dur
 cmc doctor                                    # tüm kurulumu kontrol et
 ```
 
-Telefonda **Call Claude**'a dokun ya da *"Hey Siri, CallMeClaude'u ara"* de.
+Telefonda **Call Claude**'a dokun ya da *"Hey Siri, CallMeClaude'u ara"* de. Bilgisayarda tepsi simgesine tıkla ve **Talk to Claude**'a bas.
+
+Bir oturum seni beklediğinde Claude'un seni nerede arayacağını tepsi simgesinden ya da telefon uygulamasında **Settings › When Claude needs you** bölümünden seçersin:
+
+| Seçim | Ne olur |
+|---|---|
+| **Call this computer** | Tepsi uygulaması çalar (yeşil simge, bildirim) ve bilgisayarın mikrofonuyla konuşursun. Masa modunda da burada çalar. Tepsi uygulaması kapalıysa telefon çalar |
+| **Call my phone** | Telefon her zamanki gibi çalar |
+| **Don't call** | Hiçbir şey çalmaz; güncellemeler senin başlattığın bir sonraki konuşmayı bekler |
 
 ## Güvenlik
 

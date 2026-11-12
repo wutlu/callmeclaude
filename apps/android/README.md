@@ -34,6 +34,8 @@ On the computer run `cmc pair`. In the app tap **Scan QR code**, or paste the pa
 
 To unpair: on the home screen tap **Settings** (top right) or the connection line under the title; **Unpair this computer** is the first thing in Settings.
 
+**Where Claude calls:** Settings › **When Claude needs you** picks **This phone**, **The computer** (the desktop app rings; if it isn't open, this phone rings instead) or **Don't call**. It is the same setting as in the desktop app.
+
 If the hub's token changes (`cmc pair --rotate`, or a new setup), the app stops retrying and shows **Pairing is no longer valid** with a **Pair again** button, which forgets the old pairing and opens the QR screen.
 
 ## Starting a call quickly
