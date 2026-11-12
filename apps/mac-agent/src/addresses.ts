@@ -16,7 +16,8 @@ export async function tailscaleInfo(): Promise<{ ip?: string; dns?: string }> {
 
 /**
  * IPv4 addresses on the local network. Link-local 169.254.x (USB / Thunderbolt bridges, no DHCP) is
- * never reachable from the phone, and 100.x is Tailscale's (listed separately).
+ * never reachable from the phone, and 100.x is Tailscale's (listed separately). `isLan` drops whole
+ * interfaces per OS: VPN tunnels on macOS; Tailscale and container / VM bridges on Linux.
  */
 export function lanIps(ifaces = networkInterfaces(), isLan = platform.isLanInterface) {
   const out: string[] = [];

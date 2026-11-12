@@ -8,6 +8,7 @@
   "author": "CallMeClaude contributors",
   "homepage": "https://github.com/wutlu/callmeclaude",
   "main": "dist/main.cjs",
+  "desktopName": "callmeclaude.desktop",
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/build.mjs && electron .",
@@ -77,7 +78,8 @@
       "category": "Development",
       "icon": "build/icon.png",
       "synopsis": "Claude Code sessions in your tray; talk to Claude by voice.",
-      "maintainer": "CallMeClaude contributors <noreply@github.com>"
+      "maintainer": "CallMeClaude contributors <noreply@github.com>",
+      "syncDesktopName": true
     },
     "win": {
       "target": [

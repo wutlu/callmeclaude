@@ -36,10 +36,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- The pairing token must not leave the device: no cloud backup, no device-to-device transfer. -->
-    <!-- Android 11+ package visibility: lets Speaker find the text-to-speech engine. -->
+    <!-- Android 11+ package visibility: lets Speaker find the text-to-speech engine and its "install voice data" screen. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.tts.engine.INSTALL_TTS_DATA" />
         </intent>
     </queries>
 

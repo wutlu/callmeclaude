@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Snapshot } from '@callmeclaude/protocol';
-import { autostartEntry, orderSessions, timeLeft, floatToPcm16, hubDataDir, panelPosition, parseHubConfig, parseSettings, pcm16ToFloat, trayLook } from '../src/shared.ts';
+import { autostartEntry, floatToPcm16, hasDbusName, hubDataDir, orderSessions, panelPosition, parseHubConfig, parseSettings, pcm16ToFloat, showAtStart, timeLeft, trayLook } from '../src/shared.ts';
 
 const snap = (over: Partial<Snapshot> = {}): Snapshot => ({
   mode: 'away',
@@ -92,4 +92,20 @@ test('orderSessions puts sessions that need you first and folds old finished one
   assert.deepEqual(earlier.map((s) => s.id), ['old-done']);
   assert.equal(timeLeft(new Date(now + 23.2 * 60_000).toISOString(), now), '24 min');
   assert.equal(timeLeft(new Date(now + 40_000).toISOString(), now), '40 s');
+});
+
+test('start hidden only when there is a tray to open the panel from', () => {
+  assert.equal(showAtStart({ hidden: false, trayShown: true }), true);
+  assert.equal(showAtStart({ hidden: true, trayShown: true }), false, 'login / --hidden with a tray: unchanged');
+  assert.equal(showAtStart({ hidden: true, trayShown: false }), true, 'no tray (GNOME without AppIndicator): never invisible');
+  assert.equal(showAtStart({ hidden: false, trayShown: false }), true);
+});
+
+test('NameHasOwner answers from dbus-send and gdbus', () => {
+  assert.equal(hasDbusName('method return time=1.2 sender=org.freedesktop.DBus -> destination=:1.9 serial=3 reply_serial=2\n   boolean true\n'), true);
+  assert.equal(hasDbusName('   boolean false\n'), false);
+  assert.equal(hasDbusName('(true,)\n'), true);
+  assert.equal(hasDbusName('(false,)\n'), false);
+  assert.equal(hasDbusName('Error org.freedesktop.DBus.Error.ServiceUnknown'), undefined);
+  assert.equal(hasDbusName(''), undefined);
 });

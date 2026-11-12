@@ -5,7 +5,7 @@ import { delimiter, dirname, join } from 'node:path';
 import { LOG_DIR } from '../config.ts';
 import { execFileP } from '../util.ts';
 import { binPath, SERVICE_LABEL } from './common.ts';
-import { SecretStoreError, type Platform, type SecretState } from './types.ts';
+import { SecretStoreError, type DoctorResult, type Platform, type SecretState } from './types.ts';
 import {
   desktopSessionEnv,
   envSummary,
@@ -22,10 +22,62 @@ import {
   ydotoolTooOld,
   ydotoolVersion,
   type ComputerDriver,
+  type PackageManager,
   type YdotoolVersion,
 } from './computerUse.ts';
 
 const UNIT_NAME = `${SERVICE_LABEL}.service`;
+
+/**
+ * Interfaces whose addresses are offered to the phone as LAN addresses. Tailscale has its own
+ * entries. Container and VM bridges (docker0, br-<id>, veth…, virbr…, podman…, lxcbr…, lxdbr…, cni…,
+ * vboxnet…, vmnet…) are private to this computer and the phone can never reach them. VPNs the
+ * phone may share (WireGuard wg…, ZeroTier zt…, tun…, tap…) stay: some use them instead of Tailscale.
+ * A plain "br0" stays too: that is usually the real LAN bridged for VMs. Pure.
+ */
+export function linuxLanInterface(name: string): boolean {
+  return !/^(tailscale|docker\d|br-|veth|virbr|podman|lxcbr|lxdbr|cni|vboxnet|vmnet)/.test(name);
+}
+
+/** The program `speak` uses, best first: speech-dispatcher, then espeak-ng / espeak. Pure. */
+export function speechTool(has: (bin: string) => boolean): 'spd-say' | 'espeak-ng' | 'espeak' | undefined {
+  return (['spd-say', 'espeak-ng', 'espeak'] as const).find((b) => has(b));
+}
+
+/** Doctor line for spoken "task complete" alerts on this computer. Missing = a note, not a problem. Pure. */
+export function speechReport(tool: ReturnType<typeof speechTool>, pm: PackageManager | undefined): DoctorResult {
+  if (tool === 'spd-say') return 'speech-dispatcher (spd-say)';
+  if (tool) return `${tool} (sounds robotic; speech-dispatcher sounds better → ${installCommand(pm, ['speech-dispatcher'])})`;
+  return { info: `nothing can speak (spd-say, espeak-ng or espeak), so alerts set to "computer" stay silent → ${installCommand(pm, ['speech-dispatcher', 'espeak-ng'])}` };
+}
+
+/** Does systemd-resolved answer mDNS (MulticastDNS=yes globally and on a link)? From `resolvectl status`. Pure. */
+export function resolvedAnswersMdns(status: string): boolean {
+  // systemd >= 246: "Protocols: ... +mDNS ..." per section ("mDNS/resolve" only looks names up);
+  // older: "MulticastDNS setting: yes".
+  const sections = status.split(/\n(?=\S)/);
+  const on = (sec: string) => /(^|\s)\+mDNS(\s|$)/m.test(sec) || /MulticastDNS setting:\s*yes/.test(sec);
+  const global = sections.find((x) => x.startsWith('Global'));
+  const links = sections.filter((x) => x.startsWith('Link'));
+  return !!global && on(global) && links.some(on);
+}
+
+/**
+ * Doctor line for the `<host>.local` address the hub gives the phone. Without a responder (avahi-daemon,
+ * or systemd-resolved with MulticastDNS) that name resolves to nothing: after the computer changes
+ * network the phone cannot find it again except via Tailscale or pairing again. Advice only. Pure.
+ */
+export function mdnsReport(name: string | undefined, r: { avahi: boolean; resolved: boolean }, pm: PackageManager | undefined): DoctorResult {
+  if (!name) return { info: 'no .local name sent to the phone (the hostname has characters mDNS names cannot have)' };
+  if (r.avahi) return `${name} (avahi-daemon)`;
+  if (r.resolved) return `${name} (systemd-resolved)`;
+  return {
+    info:
+      `the phone gets ${name}, but nothing here answers it (avahi-daemon inactive, systemd-resolved MulticastDNS off): ` +
+      `after a Wi-Fi change the phone finds this computer again only via Tailscale or a new pairing → ` +
+      `${installCommand(pm, ['avahi'])} && sudo systemctl enable --now avahi-daemon`,
+  };
+}
 
 const shq = (s: string) => (/^[\w@%+=:,./-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 
@@ -361,6 +413,24 @@ export const linux: Platform = {
           : `!HandleLidSwitch=${battery}, HandleLidSwitchExternalPower=${ac} → keep the lid open, or set both to ignore in /etc/systemd/logind.conf.d/`;
       },
     },
+    {
+      name: 'Spoken alerts on this computer',
+      fn: async () => speechReport(speechTool(onPath), packageManager(osRelease())),
+    },
+    {
+      name: 'Bonjour name (mDNS)',
+      fn: async () => {
+        const { mdnsName } = await import('../addresses.ts');
+        const avahi = await execFileP('systemctl', ['is-active', 'avahi-daemon'])
+          .then(() => true)
+          .catch(() => false);
+        // resolvectl fails when systemd-resolved isn't running: then it answers nothing either.
+        const resolved = await execFileP('resolvectl', ['status'], { timeout: 4000 })
+          .then((r) => resolvedAnswersMdns(r.stdout))
+          .catch(() => false);
+        return mdnsReport(mdnsName(), { avahi, resolved }, packageManager(osRelease()));
+      },
+    },
     ...computerUseChecks(),
   ],
 
@@ -400,11 +470,12 @@ export const linux: Platform = {
   shellExec: (command, opts) => execFileP(linuxShell(), ['-lc', command], { ...opts, encoding: 'utf8' }),
   servicePath: () => linuxServicePath(homedir(), process.execPath),
   tailscaleBins: ['tailscale'],
-  isLanInterface: (name) => !name.startsWith('tailscale'),
+  isLanInterface: (name) => linuxLanInterface(name),
   async speak(text, language) {
     const lang = language.split('-')[0];
-    if (onPath('spd-say')) return void (await execFileP('spd-say', ['-w', '-l', lang, text], { timeout: 60_000 }));
-    for (const bin of ['espeak-ng', 'espeak']) if (onPath(bin)) return void (await execFileP(bin, ['-v', lang, text], { timeout: 60_000 }));
+    const bin = speechTool(onPath);
+    if (bin === 'spd-say') return void (await execFileP('spd-say', ['-w', '-l', lang, text], { timeout: 60_000 }));
+    if (bin) return void (await execFileP(bin, ['-v', lang, text], { timeout: 60_000 }));
     throw new Error('Nothing can speak on this computer. Install speech-dispatcher (spd-say) or espeak-ng.');
   },
   openFile(path) {
