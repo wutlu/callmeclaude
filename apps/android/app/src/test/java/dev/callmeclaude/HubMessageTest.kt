@@ -116,4 +116,18 @@ class HubMessageTest {
         assertEquals("alert.set", set.getString("type"))
         assertEquals("computer", set.getString("target"))
     }
+
+    @Test fun parsesRingTargetAndBuildsRingSet() {
+        for (t in listOf("computer", "phone", "off")) {
+            val withRing = JSONObject(snapshotJson).put("ringTarget", t)
+            assertEquals(t, (HubMessage.parse("""{"type":"hello","v":1,"snapshot":$withRing}""") as HubMessage.Hello).snapshot!!.ringTarget)
+            assertEquals(t, (HubMessage.parse("""{"type":"snapshot","snapshot":$withRing}""") as HubMessage.SnapshotUpdate).snapshot!!.ringTarget)
+        }
+        // Older hubs send no ringTarget: the setting stays hidden.
+        assertNull((HubMessage.parse("""{"type":"snapshot","snapshot":$snapshotJson}""") as HubMessage.SnapshotUpdate).snapshot!!.ringTarget)
+        val set = JSONObject(AppMessages.ringSet("computer"))
+        assertEquals("ring.set", set.getString("type"))
+        assertEquals("computer", set.getString("target"))
+        assertEquals(setOf("type", "target"), set.keys().asSequence().toSet())
+    }
 }

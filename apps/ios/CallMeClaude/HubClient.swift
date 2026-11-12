@@ -351,6 +351,7 @@ final class HubClient: NSObject, ObservableObject {
 
     func setMode(_ m: String) { sendJSON(["type": "mode.set", "mode": m]) }
     func setLanguage(_ code: String) { sendJSON(["type": "language.set", "language": code]) }
+    func setRingTarget(_ target: String) { sendJSON(["type": "ring.set", "target": target]) }
     func setDoneAlert(_ target: String) { sendJSON(["type": "alert.set", "target": target]) }
     func panic() { sendJSON(["type": "panic"]) }
     func resume() { sendJSON(["type": "resume"]) }

@@ -318,6 +318,7 @@ class HubClient(
     private fun setConnected(v: Boolean) {
         isConnected = v
         _connected.value = v
+        if (!v) synchronized(lock) { lock.disconnected() }
     }
 
     /** Waiters give up after the idle race timeout (iOS: 7 s), however many races run meanwhile. */
@@ -387,7 +388,9 @@ class HubClient(
                 _status.value = "Connected to ${_pairing.value?.name ?: "computer"}"
                 flushWaiters(true)
                 flushLogs()
-                locked?.let { task?.send(AppMessages.deviceLock(it)) }
+                // A new connection starts "unknown" on the hub: always tell it, read fresh.
+                val fresh = runCatching { lockProbe?.invoke() }.getOrNull()
+                synchronized(lock) { lock.connected(fresh) }
                 onConnected?.invoke()
             }
             is HubMessage.SnapshotUpdate -> msg.snapshot?.let { _snapshot.value = it }
@@ -415,15 +418,20 @@ class HubClient(
         task?.send(text)
     }
 
-    /** Last known lock state; re-sent after every hello so a reconnected hub knows it too. */
-    @Volatile private var locked: Boolean? = null
+    /**
+     * Lock state reporting (see [LockReport]); guarded by itself. Sent on the caller's thread, not
+     * posted: a quick call from the lock screen reports the lock right before `call.start`, and the
+     * hub must get them in that order.
+     */
+    private val lock = LockReport { v -> task?.send(AppMessages.deviceLock(v)) }
 
-    /** The phone's secure lock screen came or went (see [LockWatcher]). Any thread. */
-    fun setLocked(value: Boolean) {
-        if (locked == value) return
-        locked = value
-        AppLog.i(TAG, "lock: $value")
-        sendJSON(AppMessages.deviceLock(value))
+    /** A fresh lock reading for the hello of a new connection (set by the app, see [LockWatcher]). Any thread. */
+    @Volatile var lockProbe: (() -> Boolean)? = null
+
+    /** A lock reading (see [LockWatcher]); sent if it changed. Any thread. */
+    fun setLocked(value: Boolean, why: String) {
+        val changed = synchronized(lock) { lock.observed(value) }
+        if (changed) AppLog.i(TAG, "lock: $value ($why)${if (_connected.value) "" else ", sent on connect"}")
     }
 
     /** Microphone audio. Thread-safe; dropped while there is no connection (the hub keeps the call 20 s). */
@@ -433,6 +441,7 @@ class HubClient(
 
     fun setMode(mode: String) = sendJSON(AppMessages.modeSet(mode))
     fun setLanguage(code: String) = sendJSON(AppMessages.languageSet(code))
+    fun setRingTarget(target: String) = sendJSON(AppMessages.ringSet(target))
     fun setDoneAlert(target: String) = sendJSON(AppMessages.alertSet(target))
     fun panic() = sendJSON(AppMessages.panic())
     fun resume() = sendJSON(AppMessages.resume())

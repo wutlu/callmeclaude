@@ -38,8 +38,7 @@ class CallClaudeActivity : Activity() {
         // fully stopped. Allowed here because this activity is in the foreground.
         if (paired) HubService.sync(this, true)
         // Started from the lock screen (tile): make sure the hub knows before the call starts.
-        val keyguard = getSystemService(KeyguardManager::class.java)
-        hub.setLocked(keyguard.isDeviceSecure && keyguard.isKeyguardLocked)
+        app.lock.check("quick call")
         when (decision) {
             QuickCall.OPEN_PAIRING -> openApp(Intent(this, MainActivity::class.java))
             QuickCall.ASK_MICROPHONE -> openApp(Intent(this, MainActivity::class.java).setAction(ACTION_CALL_CLAUDE))

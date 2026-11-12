@@ -38,7 +38,7 @@ Claude Code saatlerce kendi başına çalışabiliyor, ama bir izin istediğinde
 - **Telefonunu gerçekten çaldırır**: PushKit ve CallKit ile. Kilit ekranında çalışır, Bluetooth ya da interkom cevap tuşu çalışır, aramalar Son Aramalar'da görünür. Android uygulaması, hub'a kendi kalıcı bağlantısı üzerinden Android'in Telecom altyapısıyla çalar (Google push servisi yok).
 - **Doğal, sözü kesilebilen ses**: yaklaşık bir saniye gecikmeli Gemini Live sesten sese model. Telefon gibi konuşur: kısa cümleler, dosya yolu yok, her seferinde tek soru.
 - **Senin dilini konuşur**: konuşma dilini uygulamada ya da `cmc setup --language` ile seç (`en-US`, `tr-TR`, `de-DE`, `es-ES`, …). Claude aramalarda bu dili konuşur ve oturum özetlerini bu dilde yazar. "Bundan sonra Almanca konuş" da diyebilirsin. Uygulama ve CLI'ın kendisi İngilizcedir.
-- **Oturum bitince söyler** (isteğe bağlı): "acme web projesi görevi tamamlandı." cümlesini konuşma dilinde sesli okur; ya **bu bilgisayarda** (sistem sesi: macOS'ta `say`, Linux'ta `spd-say`/`espeak-ng`) ya da **telefonunda** (uygulamanın kendi sesiyle, kulaklık ya da interkom üzerinden). 20 saniyeden kısa turlar sessiz geçer. Masaüstü panelinden ya da telefon uygulamasının ayarlarından seçilir.
+- **Oturum bitince söyler** (isteğe bağlı): "acme web projesi görevi tamamlandı." cümlesini konuşma dilinde sesli okur; ya **bu bilgisayarda** (sistem sesi: macOS'ta `say`; Linux'ta speech-dispatcher'ın `spd-say`'i ya da robotik sesli espeak-ng) ya da **telefonunda** (uygulamanın kendi sesiyle, kulaklık ya da interkom üzerinden). 20 saniyeden kısa turlar sessiz geçer. Masaüstü panelinden ya da telefon uygulamasının ayarlarından seçilir.
 - **Oturumları uzaktan açar**. Duran oturumu açık tutar ve sesli talimatınla devam ettirir (`Stop` hook'u `decision: block`). İzin istemlerini cevaplayabilir, tmux oturumlarına yazabilir, biten oturumları sürdürebilir ya da talimatı bir sonraki adım için kuyruğa koyabilir.
 - **Ajan yapamadığında bilgisayarı senin yerine kullanır**: Claude in Chrome, [Peekaboo](https://github.com/steipete/Peekaboo) ve `cliclick` ile. Linux'ta Claude in Chrome ile masaüstünün ekran görüntüsü ve giriş araçlarını kullanır (bkz. [hangi ortamda ne çalışır](#hangi-ortamda-ne-çalışır)). Her zaman önce açık sesli onay ister.
 - **Günlerce gözetimsiz çalışmak için**: launchd servisi (Linux'ta systemd `--user`), uyku önleme kontrolleri, hücresel erişim için Tailscale, yeniden bağlanmaya dayanan aramalar, panik anahtarı ve tam denetim kaydı.
@@ -160,7 +160,15 @@ cmc panic                                     # her şeyi durdur, otomasyonu dur
 cmc doctor                                    # tüm kurulumu kontrol et
 ```
 
-Telefonda **Call Claude**'a dokun ya da *"Hey Siri, CallMeClaude'u ara"* de.
+Telefonda **Call Claude**'a dokun ya da *"Hey Siri, CallMeClaude'u ara"* de. Bilgisayarda tepsi simgesine tıkla ve **Talk to Claude**'a bas.
+
+Bir oturum seni beklediğinde Claude'un seni nerede arayacağını tepsi simgesinden ya da telefon uygulamasında **Settings › When Claude needs you** bölümünden seçersin:
+
+| Seçim | Ne olur |
+|---|---|
+| **Call this computer** | Tepsi uygulaması çalar (yeşil simge, bildirim) ve bilgisayarın mikrofonuyla konuşursun. Masa modunda da burada çalar. Tepsi uygulaması kapalıysa telefon çalar |
+| **Call my phone** | Telefon her zamanki gibi çalar |
+| **Don't call** | Hiçbir şey çalmaz; güncellemeler senin başlattığın bir sonraki konuşmayı bekler |
 
 ## Güvenlik
 

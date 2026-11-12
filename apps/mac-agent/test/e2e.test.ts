@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
@@ -455,4 +455,64 @@ test('background sessions are found from running claude -p processes (also ones 
     'grep claude -p --session-id zzz',
   ].join('\n');
   assert.deepEqual([...headlessIds(ps)].sort(), ['bbb-1', 'ccc']);
+});
+
+test('background sessions started by an npm-installed Claude Code (node script) are found too', async () => {
+  const { headlessIds } = await import('../src/controller.ts');
+  const ps = [
+    'node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js -p --resume aaa --fork-session --session-id npm-1 --permission-mode acceptEdits hi',
+    '/home/u/.nvm/versions/node/v24.1.0/bin/node /home/u/.nvm/versions/node/v24.1.0/lib/node_modules/@anthropic-ai/claude-code/cli.js --print --resume npm-2 hi',
+    'node /home/u/.npm-global/bin/claude -p --resume npm-3 hi',
+    '/usr/bin/nodejs /usr/local/bin/claude -p --session-id npm-4 hi',
+    // not headless, or not Claude Code:
+    'node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js --resume npm-x',
+    'node /opt/app/node_modules/electron/cli.js -p --session-id elec',
+    'node /opt/tool/cli.js -p --session-id other',
+    'node -e claude -p --session-id inline',
+    'bash -c node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js -p --session-id shell',
+  ].join('\n');
+  assert.deepEqual([...headlessIds(ps)].sort(), ['npm-1', 'npm-2', 'npm-3', 'npm-4']);
+});
+
+test('lock audit: the first report of every connection, then only changes', async () => {
+  const { auditLockReport } = await import('../src/appServer.ts');
+  assert.equal(auditLockReport(undefined, false), true, 'first report, unlocked');
+  assert.equal(auditLockReport(undefined, true), true, 'first report, locked');
+  assert.equal(auditLockReport(false, false), false);
+  assert.equal(auditLockReport(true, true), false);
+  assert.equal(auditLockReport(false, true), true);
+  assert.equal(auditLockReport(true, false), true);
+
+  const lockLines = () =>
+    readdirSync(join(home, 'audit'))
+      .flatMap((f) => readFileSync(join(home, 'audit', f), 'utf8').split('\n'))
+      .filter(Boolean)
+      .map((l) => JSON.parse(l))
+      .filter((e) => e.kind === 'app.lock' && e.device === 'lock-phone')
+      .map((e) => e.locked);
+  const connect = (): Promise<WebSocket> =>
+    new Promise((res) => {
+      const ws = new WebSocket(`ws://127.0.0.1:${APP}`);
+      ws.on('message', (d) => JSON.parse(d.toString()).type === 'hello' && res(ws));
+      ws.on('open', () => ws.send(JSON.stringify({ type: 'auth', token: 'apptok', device: 'lock-phone', v: 1 })));
+    });
+  // Messages of one socket are handled in order: a ping answered means the reports before it are done.
+  const flush = (ws: WebSocket) =>
+    new Promise<void>((res) => {
+      ws.on('message', (d) => JSON.parse(d.toString()).type === 'heartbeat' && res());
+      ws.send(JSON.stringify({ type: 'ping' }));
+    });
+  const report = (ws: WebSocket, ...states: boolean[]) => states.forEach((locked) => ws.send(JSON.stringify({ type: 'device.lock', locked })));
+
+  const a = await connect();
+  report(a, false, false, true, true, false);
+  await flush(a);
+  assert.deepEqual(lockLines(), [false, true, false], 'unlocked on connect is recorded; repeats are not');
+  a.close();
+
+  const b = await connect();
+  report(b, false, false);
+  await flush(b);
+  assert.deepEqual(lockLines(), [false, true, false, false], 'a reconnect records its first report again, even unchanged');
+  b.close();
 });

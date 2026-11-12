@@ -180,9 +180,10 @@ export class AppServer {
         return;
       }
       case 'device.lock': {
-        const was = c.locked === true;
+        const prev = c.locked;
+        const was = prev === true;
         c.locked = msg.locked === true;
-        if (was !== c.locked) audit('app.lock', { device: c.device, locked: c.locked });
+        if (auditLockReport(prev, c.locked)) audit('app.lock', { device: c.device, locked: c.locked });
         // Unlocked mid-call: an action refused while locked can go ahead now.
         if (was && !c.locked && this.hub.voice.active?.sinkId === c.id)
           this.hub.voice.active.inject('The phone is unlocked now: an action that was refused because the phone was locked can be done if the developer still wants it (ask them to confirm again).', 'now');
@@ -234,6 +235,15 @@ export class AppServer {
       }
     }
   }
+}
+
+/**
+ * Should a `device.lock` report go to the audit log? The first one of every connection always: a new
+ * connection starts at "unknown" (treated as unlocked), so a phone reporting "unlocked" on connect used
+ * to leave no trace. Later reports only when the state changes. Pure.
+ */
+export function auditLockReport(prev: boolean | undefined, now: boolean): boolean {
+  return prev === undefined || prev !== now;
 }
 
 function safeEq(a: string, b: string) {

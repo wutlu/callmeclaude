@@ -330,7 +330,11 @@ async function doctor() {
   };
   await check('Claude Code installed', async () => (await execFileP('claude', ['--version'])).stdout.trim());
   await check('Claude Code login (your own plan)', async () => {
-    const { stdout } = await execFileP('claude', ['-p', 'Reply with just OK.', '--model', 'haiku', '--max-turns', '1'], { timeout: 60_000, env: { ...process.env, CMC_INTERNAL: '1' } });
+    const run = execFileP('claude', ['-p', 'Reply with just OK.', '--model', 'haiku', '--max-turns', '1'], { timeout: 60_000, env: { ...process.env, CMC_INTERNAL: '1' } });
+    // The prompt is an argument; an open stdin makes newer Claude Code wait for piped input and fail
+    // ("no stdin data received in 3s") when doctor runs without a terminal.
+    run.child.stdin?.end();
+    const { stdout } = await run;
     return stdout.trim() ? 'working' : '!empty reply';
   });
   await check('Hooks installed', async () => hooksInstalled());

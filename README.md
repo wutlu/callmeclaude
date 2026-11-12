@@ -40,7 +40,7 @@ You can also call Claude yourself at any time ("Hey Siri, call CallMeClaude"). A
 - **Speaks your language**: pick the conversation language in the app or with `cmc setup --language` (`en-US`, `tr-TR`, `de-DE`, `es-ES`, …). Claude speaks it on calls and writes session summaries in it. You can also say "from now on speak German". The app and CLI themselves are in English.
 - **Unblocks sessions remotely**. It holds a stopped session open and continues it with your spoken instruction (`Stop` hook `decision: block`). It can also answer permission prompts, type into tmux sessions, resume ended sessions, queue the instruction for a busy session's next step, or continue an idle IDE/desktop session in a headless fork of its conversation.
 - **Uses the computer for you** when an agent can't, with Claude in Chrome, [Peekaboo](https://github.com/steipete/Peekaboo) and `cliclick`. On Linux it uses Claude in Chrome plus the screenshot and input tools of your desktop (see [what works where](#what-works-where)). It always asks for explicit voice confirmation first.
-- **Says when a session is done** (optional): "acme-web: task complete." out loud in your conversation language, on **this computer** (the system voice: `say` on macOS, `spd-say`/`espeak-ng` on Linux) or on **your phone** (the app's own voice, through your headset or intercom). Short turns under 20 seconds stay silent. Pick it in the desktop panel or the phone app's settings.
+- **Says when a session is done** (optional): "acme-web: task complete." out loud in your conversation language, on **this computer** (the system voice: `say` on macOS; on Linux speech-dispatcher's `spd-say`, or espeak-ng, which sounds robotic) or on **your phone** (the app's own voice, through your headset or intercom). Short turns under 20 seconds stay silent. Pick it in the desktop panel or the phone app's settings.
 - **Desktop tray app** for macOS and Linux (dmg, AppImage, deb): sessions, approvals and modes in the menu bar or system tray, a green icon while Claude calls, and voice calls with Claude on the computer itself. Choose where Claude calls you: **this computer**, **your phone**, or **nowhere**. With "this computer" you don't need a phone at all. Turn on **Answer calls automatically** and the computer picks up by itself after a few seconds of ringing.
 - **Built for unattended days away**: a launchd service (systemd `--user` on Linux), sleep-prevention checks, Tailscale for cellular access, calls that survive reconnects, a panic switch and a full audit log.
 
@@ -164,7 +164,7 @@ cmc doctor                                    # check the whole setup
 
 On the phone, tap **Call Claude**, or say *"Hey Siri, call CallMeClaude"*. On the computer, click the tray icon and press **Talk to Claude**.
 
-The tray icon also picks where Claude calls you when a session needs you:
+The tray icon, or **Settings › When Claude needs you** in the phone app, picks where Claude calls you when a session needs you:
 
 | Choice | What happens |
 |---|---|
