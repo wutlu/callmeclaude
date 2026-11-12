@@ -430,3 +430,20 @@ test('background sessions are found from running claude -p processes (also ones 
   ].join('\n');
   assert.deepEqual([...headlessIds(ps)].sort(), ['bbb-1', 'ccc']);
 });
+
+test('background sessions started by an npm-installed Claude Code (node script) are found too', async () => {
+  const { headlessIds } = await import('../src/controller.ts');
+  const ps = [
+    'node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js -p --resume aaa --fork-session --session-id npm-1 --permission-mode acceptEdits hi',
+    '/home/u/.nvm/versions/node/v24.1.0/bin/node /home/u/.nvm/versions/node/v24.1.0/lib/node_modules/@anthropic-ai/claude-code/cli.js --print --resume npm-2 hi',
+    'node /home/u/.npm-global/bin/claude -p --resume npm-3 hi',
+    '/usr/bin/nodejs /usr/local/bin/claude -p --session-id npm-4 hi',
+    // not headless, or not Claude Code:
+    'node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js --resume npm-x',
+    'node /opt/app/node_modules/electron/cli.js -p --session-id elec',
+    'node /opt/tool/cli.js -p --session-id other',
+    'node -e claude -p --session-id inline',
+    'bash -c node /usr/lib/node_modules/@anthropic-ai/claude-code/cli.js -p --session-id shell',
+  ].join('\n');
+  assert.deepEqual([...headlessIds(ps)].sort(), ['npm-1', 'npm-2', 'npm-3', 'npm-4']);
+});

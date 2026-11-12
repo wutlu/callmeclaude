@@ -23,9 +23,13 @@ export function headlessIds(psOutput: string): Set<string> {
   const ids = new Set<string>();
   for (const line of psOutput.split('\n')) {
     const words = line.trim().split(/\s+/);
-    // The program itself must be claude (not a shell or grep whose arguments mention it).
-    if (!/(^|\/)claude$/.test(words[0] ?? '')) continue;
-    const args = words.slice(1);
+    // The program itself must be claude (not a shell or grep whose arguments mention it). Installed with
+    // npm, Claude Code is a node script: `node …/@anthropic-ai/claude-code/cli.js -p …`, or
+    // `node …/bin/claude -p …` when started through the npm bin link (the kernel runs its #! interpreter).
+    let at0 = 0;
+    if (/(^|\/)node(js)?$/.test(words[0] ?? '') && /((^|\/)claude|\/@anthropic-ai\/claude-code\/cli\.m?js)$/.test(words[1] ?? '')) at0 = 1;
+    else if (!/(^|\/)claude$/.test(words[0] ?? '')) continue;
+    const args = words.slice(at0 + 1);
     if (!args.includes('-p') && !args.includes('--print')) continue;
     const at = (flag: string) => {
       const i = args.indexOf(flag);
