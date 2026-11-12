@@ -433,6 +433,7 @@ class HubClient(
 
     fun setMode(mode: String) = sendJSON(AppMessages.modeSet(mode))
     fun setLanguage(code: String) = sendJSON(AppMessages.languageSet(code))
+    fun setRingTarget(target: String) = sendJSON(AppMessages.ringSet(target))
     fun setDoneAlert(target: String) = sendJSON(AppMessages.alertSet(target))
     fun panic() = sendJSON(AppMessages.panic())
     fun resume() = sendJSON(AppMessages.resume())
