@@ -7,7 +7,7 @@ import { classify, quickClassify } from './classifier.ts';
 import { criticalReason } from './critical.ts';
 import { isReadOnly } from './readOnly.ts';
 import type { Pending, Session } from './state.ts';
-import { audit, clip, log, shortId } from './util.ts';
+import { audit, clip, log, plainText, redact, shortId } from './util.ts';
 import type { Risk } from '@callmeclaude/protocol';
 
 type Json = Record<string, any>;
@@ -102,7 +102,11 @@ async function handle(hub: Hub, event: string, input: Json, pane: string | undef
   const base: Partial<Session> = { transcriptPath: input.transcript_path ?? '' };
   if (pane) base.tmuxPane = pane;
   if (event === 'SubagentStart' || event === 'SubagentStop') return onSubagent(hub, event, input, base, send);
-  if (input.agent_id) return send({}); // other subagent-level events: ignore, the main thread reports
+  if (input.agent_id) {
+    // Other subagent-level events: the main thread reports. They only show the subagent is still alive.
+    st.touchSubagent(sid, String(input.agent_id));
+    return send({});
+  }
 
   switch (event) {
     case 'SessionStart': {
@@ -183,7 +187,8 @@ function onSubagent(hub: Hub, event: 'SubagentStart' | 'SubagentStop', input: Js
     st.upsertSubagent(s.id, input.cwd, agentId, {
       type,
       state: 'done',
-      ...(msg ? { summary: clip(msg, 160) } : {}),
+      // Shown on the phone: no markdown, no secrets.
+      ...(msg ? { summary: clip(plainText(redact(msg)), 160) } : {}),
       ...(input.agent_transcript_path ? { transcriptPath: String(input.agent_transcript_path) } : {}),
     });
     audit('subagent.stop', { session: s.id, agent: agentId, type });

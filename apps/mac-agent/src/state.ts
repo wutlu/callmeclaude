@@ -68,6 +68,12 @@ const nameCache = new Map<string, string>();
 /** Finished subagents stay visible for a while; long sessions don't accumulate them forever. */
 const SUBAGENT_TTL_MS = 60 * 60e3;
 const MAX_SUBAGENTS = 20;
+/**
+ * A "running" subagent with no sign of life for this long is taken as finished: its SubagentStop never
+ * came (the session was killed, or the hub was down). Otherwise it would keep its session from ever
+ * being reported as stuck.
+ */
+export const SUBAGENT_SILENT_MS = 60 * 60e3;
 const MAX_SUBAGENTS_IN_CARD = 8;
 
 /** Project name = the git repository root's folder name (so sub-folders map to their project). */
@@ -193,6 +199,24 @@ export class State extends EventEmitter {
     }
     this.changed();
     return s;
+  }
+
+  /** A tool event from inside a subagent: it is alive. Not a visible change, so no snapshot goes out. */
+  touchSubagent(sessionId: string, id: string) {
+    const a = this.sessions.get(sessionId)?.subagents?.find((x) => x.id === id);
+    if (a?.state === 'running') a.updatedAt = new Date().toISOString();
+  }
+
+  /** Running subagents that have been silent for too long count as finished (see SUBAGENT_SILENT_MS). */
+  expireSubagents(s: Session, now = Date.now()) {
+    let touched = false;
+    for (const a of s.subagents ?? []) {
+      if (a.state === 'running' && now - Date.parse(a.updatedAt) > SUBAGENT_SILENT_MS) {
+        a.state = 'done';
+        touched = true;
+      }
+    }
+    if (touched) this.changed();
   }
 
   /** A closing session takes its running subagents with it. */

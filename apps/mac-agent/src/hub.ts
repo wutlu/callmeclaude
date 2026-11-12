@@ -142,6 +142,8 @@ export class Hub {
         this.st.changed();
         continue;
       }
+      // A working subagent is activity too (its tool events don't touch the session), but only while it shows signs of life.
+      this.st.expireSubagents(s, now);
       if (s.state !== 'running' || (s.subagents ?? []).some((a) => a.state === 'running')) continue;
       const idleMin = (now - Date.parse(s.updatedAt)) / 60000;
       if (idleMin > 20) {
