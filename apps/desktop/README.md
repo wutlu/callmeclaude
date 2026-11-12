@@ -48,6 +48,10 @@ After the first open, macOS no longer asks. On the first call it asks for microp
 
 **Linux:** make the AppImage executable (`chmod +x CallMeClaude-*.AppImage`) and run it, or install the deb with `sudo apt install ./CallMeClaude-*.deb`.
 
+- **The AppImage needs FUSE 2** (`libfuse.so.2`). If it does not start ("dlopen(): error loading libfuse.so.2"), install it: Arch `sudo pacman -S fuse2`, Ubuntu 22.04 / Debian 12 `sudo apt install libfuse2`, Ubuntu 24.04 and later `sudo apt install libfuse2t64`, Fedora `sudo dnf install fuse-libs`. Or run it without FUSE: `./CallMeClaude-*.AppImage --appimage-extract-and-run`.
+- **GNOME needs the AppIndicator extension for the tray icon** (Ubuntu ships it; elsewhere install "AppIndicator and KStatusNotifierItem Support", package `gnome-shell-extension-appindicator`). KDE Plasma and most other desktops have a tray already. Without a tray the panel opens at start (also at login) and closing it minimizes it, so the app never runs invisibly.
+- **Spoken "task complete" alerts on this computer** use speech-dispatcher (`spd-say`) or, without it, espeak-ng; espeak-ng alone sounds robotic. Install `speech-dispatcher` and `espeak-ng` with your package manager; `cmc doctor` shows which one will speak.
+
 ## Develop
 
 ```bash

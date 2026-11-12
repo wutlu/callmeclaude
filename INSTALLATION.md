@@ -181,8 +181,14 @@ Commands work on every distribution unless they are labelled **Debian/Ubuntu/Min
 | Computer use, Wayland + KDE | `sudo apt install kde-spectacle wl-clipboard` | `sudo dnf install spectacle wl-clipboard` | `sudo pacman -S spectacle wl-clipboard` |
 | Computer use, Wayland + Sway / Hyprland | `sudo apt install grim wl-clipboard` | `sudo dnf install grim wl-clipboard` | `sudo pacman -S grim wl-clipboard` |
 | Mouse and keyboard on Wayland (optional) | ydotool 1.x, see [L7](#l7-optional-mouse-and-keyboard-on-wayland-ydotool) | same | same |
+| Spoken "task complete" alerts on this computer (optional) | `sudo apt install speech-dispatcher espeak-ng` | `sudo dnf install speech-dispatcher espeak-ng` | `sudo pacman -S speech-dispatcher espeak-ng` |
+| Finding the computer by name after a Wi-Fi change (optional, `<host>.local`) | `sudo apt install avahi-daemon` | `sudo dnf install avahi` | `sudo pacman -S avahi`, then `sudo systemctl enable --now avahi-daemon` |
+| Desktop tray app as an AppImage ([apps/desktop](apps/desktop/README.md)) | Ubuntu 22.04 / Debian 12: `sudo apt install libfuse2`; Ubuntu 24.04+: `sudo apt install libfuse2t64` | `sudo dnf install fuse-libs` | `sudo pacman -S fuse2` |
+| Tray icon on GNOME | the AppIndicator extension (Ubuntu ships it; Debian: `sudo apt install gnome-shell-extension-appindicator`) | `sudo dnf install gnome-shell-extension-appindicator` | `sudo pacman -S gnome-shell-extension-appindicator` |
 
 KDE Wallet provides the Secret Service on KDE Plasma, so `secret-tool` stores the keys there and gnome-keyring is not needed. On X11, `import` (ImageMagick) or `maim` work instead of `scrot`, and `xsel` instead of `xclip`. `xclip` / `wl-clipboard` let the agent type text in any language ([L6](#l6-computer-use-on-linux)). GNOME on Wayland has no screenshot tool the hub can use (see [Honest limits](#honest-limits)).
+
+Spoken alerts: speech-dispatcher (`spd-say`) is used when it is there, else espeak-ng or espeak, which sound robotic on their own; `cmc doctor` shows which one speaks. The hub gives the phone `<host>.local` too, so it can find the computer again after a Wi-Fi change; that name only works while avahi-daemon (or systemd-resolved with MulticastDNS) answers it, and `cmc doctor` says when nothing does. The AppImage can also run without FUSE: `./CallMeClaude-*.AppImage --appimage-extract-and-run`.
 
 Check: `node --version && pnpm --version && claude --version && command -v secret-tool`
 
@@ -368,6 +374,9 @@ Check: lock the phone and run `cmc call-me`.
 | `cmc doctor`: "ydotool 1.x required" | Your ydotool is 0.1.x (Ubuntu 22.04, Mint 21) and is ignored. Install 1.x ([L7](#l7-optional-mouse-and-keyboard-on-wayland-ydotool)). |
 | A voice-started session: "Project folder not found" | The folder is not under a project root. `cmc doctor` lists them; add yours to `projectRoots` ([L2](#l2-install-the-hub)). |
 | Computer use says it cannot type text, or that a clipboard tool is missing | Install `wl-clipboard` (Wayland) or `xclip` (X11) ([L6](#l6-computer-use-on-linux)). |
+| The desktop AppImage does not start: "dlopen(): error loading libfuse.so.2" | Install FUSE 2 ([L1](#l1-requirements): `fuse2` / `libfuse2` / `libfuse2t64` / `fuse-libs`), or run `./CallMeClaude-*.AppImage --appimage-extract-and-run`. |
+| No CallMeClaude icon in the GNOME top bar | Enable the AppIndicator extension ([L1](#l1-requirements)). Until then the panel opens at start and minimizes instead of hiding. |
+| "Task complete" is not spoken on the computer, or sounds robotic | `cmc doctor` → "Spoken alerts on this computer". Install `speech-dispatcher` and `espeak-ng` ([L1](#l1-requirements)). |
 | `cmc run`: "needs tmux" | Install tmux, or start `claude` yourself; the hub still watches it and calls you. Voice-started sessions follow the setup choice (`cmc setup --tmux` / `--no-tmux`). |
 
 ### Android

@@ -14,12 +14,19 @@ class CallMeClaudeApp : Application() {
     lateinit var calls: CallManager
         private set
 
+    /** Lock screen state for the hub; watches for the life of the process. */
+    lateinit var lock: LockWatcher
+        private set
+
     override fun onCreate() {
         super.onCreate()
         val device = Settings.Global.getString(contentResolver, Settings.Global.DEVICE_NAME)
             ?.takeIf { it.isNotBlank() } ?: Build.MODEL
         hub = HubClient(PairingStore(this), device)
         NetworkWatcher(this, hub::networkChanged).start()
+        lock = LockWatcher(this, hub::setLocked)
+        hub.lockProbe = lock::lockedNow
+        lock.start()
         HubService.ensureChannels(this)
         calls = CallManager(this, hub) { m -> CallAudio(this, hub::sendBinary) { m.micMuted } }
         val p = dev.callmeclaude.ui.PlatformChecks.read(this)
