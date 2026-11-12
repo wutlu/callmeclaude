@@ -108,6 +108,9 @@ class CallManager(
 
     private val announcer = Speaker(context)
 
+    /** Main thread. Frees the text-to-speech engine (the hub service stopped); the next alert starts it again. */
+    fun releaseSpeech() = announcer.shutdown()
+
     init {
         registerAccount()
         hub.onMessage = { m -> main.post { onHub(m) } }

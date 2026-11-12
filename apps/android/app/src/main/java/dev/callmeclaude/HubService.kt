@@ -72,6 +72,7 @@ class HubService : Service() {
 
     override fun onDestroy() {
         if (current === this) current = null
+        app.calls.releaseSpeech()
         scope.cancel()
         app.hub.setActive(REASON, false)
         foreground = false

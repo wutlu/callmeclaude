@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) {
             acceptDebugPairing(intent)
             acceptCallRequest(intent)
+            DebugHooks.probeSpeech(this, intent)
         }
         setContent { App(hub, (application as CallMeClaudeApp).calls, callRequest) }
         // Paired → keep the hub connection in the foreground service; unpaired → stop it.
@@ -47,6 +48,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         acceptDebugPairing(intent)
         acceptCallRequest(intent)
+        DebugHooks.probeSpeech(this, intent)
     }
 
     override fun onStart() {
