@@ -38,14 +38,12 @@ class HubService : Service() {
     private var foreground = false
     private var types = -1
     private var call: CallManager.CallUi? = null
-    private var lock: LockWatcher? = null
 
     override fun onCreate() {
         super.onCreate()
         ensureChannels(this)
         current = this
         app.hub.setActive(REASON, true)
-        lock = LockWatcher(this) { app.hub.setLocked(it) }.also { it.start() }
         scope.launch {
             combine(app.hub.connected, app.hub.status, app.hub.pairing, app.hub.pairingInvalid) { c, s, p, bad -> Status(c, s, p, bad) }
                 .collect { st ->
@@ -74,8 +72,6 @@ class HubService : Service() {
 
     override fun onDestroy() {
         if (current === this) current = null
-        lock?.stop()
-        lock = null
         scope.cancel()
         app.hub.setActive(REASON, false)
         foreground = false

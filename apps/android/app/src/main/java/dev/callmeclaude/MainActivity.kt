@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         hub.setActive("ui", true)
+        (application as CallMeClaudeApp).lock.check("app opened")
     }
 
     override fun onStop() {
