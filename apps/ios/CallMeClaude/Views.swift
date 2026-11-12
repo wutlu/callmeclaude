@@ -386,6 +386,21 @@ struct SettingsView: View {
                     Text("Claude speaks this language on calls and writes session summaries in it. Takes full effect from the next call.")
                 }
 
+                if let current = hub.snapshot?.ringTarget {
+                    Section {
+                        Picker("Call", selection: Binding(get: { current }, set: { hub.setRingTarget($0) })) {
+                            Text("This phone").tag("phone")
+                            Text("The Mac").tag("computer")
+                            Text("Don't call").tag("off")
+                        }
+                    } header: {
+                        Text("When Claude needs you")
+                    } footer: {
+                        Text(current == "computer" ? "If the desktop app isn't open on the Mac, this phone rings instead."
+                             : current == "off" ? "Nothing rings. Updates wait until you start a conversation." : "")
+                    }
+                }
+
                 if let current = hub.snapshot?.doneAlert {
                     Section {
                         Picker("Spoken alert", selection: Binding(get: { current }, set: { hub.setDoneAlert($0) })) {
