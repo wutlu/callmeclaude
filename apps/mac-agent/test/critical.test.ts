@@ -139,6 +139,8 @@ test('UUIDs are not card numbers, real card numbers still are', () => {
 test('a question to the developer is never critical, the same words in a browser still are', () => {
   const q = { questions: [{ question: 'Log in with the test user (password in .env) and pick "Logged in".', header: 'Login', options: [{ label: 'Logged in' }] }] };
   assert.equal(criticalReason('AskUserQuestion', q), undefined);
+  const plan = { plan: '1. Add a login page with a password field.\n2. Wire the payment form to the checkout API and test a purchase.' };
+  assert.equal(criticalReason('ExitPlanMode', plan), undefined);
   assert.ok(criticalReason('mcp__claude-in-chrome__form_input', { ref: 'pw', value: 'x', label: 'Password' }));
   assert.ok(criticalReason('SomeUnknownTool', { text: 'enter your password' }));
 });

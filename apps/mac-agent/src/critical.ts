@@ -3,8 +3,9 @@
 // or destroys data that can't be brought back. Editing code ABOUT payments is not paying, so file tools
 // are never critical; only actions that reach the outside world (or wipe data) are checked.
 
-// AskUserQuestion only puts a question to the developer; its text (a login to try, a price to confirm) is not an action.
-const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'NotebookRead', 'Glob', 'Grep', 'LS', 'TodoWrite', 'BashOutput', 'KillShell', 'ToolSearch', 'WebSearch', 'WebFetch', 'Task', 'Agent', 'Skill', 'AskUserQuestion']);
+// AskUserQuestion only puts a question to the developer and ExitPlanMode only shows a plan; their text (a login to
+// try, a payment flow to build) is not an action.
+const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'NotebookRead', 'Glob', 'Grep', 'LS', 'TodoWrite', 'BashOutput', 'KillShell', 'ToolSearch', 'WebSearch', 'WebFetch', 'Task', 'Agent', 'Skill', 'AskUserQuestion', 'ExitPlanMode']);
 
 /** Words that mean money moves, an account is made, or someone logs in: checked in what a browser/app tool types, fills or opens. */
 const MONEY_OR_ACCOUNT =
