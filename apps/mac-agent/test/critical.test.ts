@@ -46,7 +46,8 @@ test('money, accounts, credentials, messages to people and wiping data are criti
 });
 
 // Shapes that made the hub ask a developer for nothing on a real machine: a mail folder, a mail.ts file, a mail(...) helper in
-// test code, a grep pattern that lists "mail", a messaging or payment host inside grep / sed / git.
+// test code, a grep pattern that lists "mail", a messaging or payment host inside grep / sed / git, a UUID read as a
+// card number, a question to the developer that mentions a login.
 test('mail as a path, a file name or a word is not sending a message', () => {
   const ok = [
     'cat src/mail/send.ts',
@@ -125,6 +126,21 @@ test('a payment or messaging host is critical only when a request goes to it', (
     'stripe charges create --amount 100',
   ];
   for (const command of pay) assert.equal(criticalReason('Bash', { command }), 'moves money', command);
+});
+
+test('UUIDs are not card numbers, real card numbers still are', () => {
+  assert.equal(criticalReason('Bash', { command: 'claude --resume 11111111-2222-3333-4444-555555555555 -p hi' }), undefined);
+  assert.equal(criticalReason('Bash', { command: 'echo 99999999-2222-3333-4444-555555555555' }), undefined);
+  assert.equal(criticalReason('Bash', { command: 'echo 4242 4242 4242 4242' }), 'contains a card number');
+  assert.equal(criticalReason('Bash', { command: 'echo 4242424242424242' }), 'contains a card number');
+  assert.equal(criticalReason('mcp__claude-in-chrome__form_input', { ref: 'x', value: '4242-4242-4242-4242' }), 'enters a card number');
+});
+
+test('a question to the developer is never critical, the same words in a browser still are', () => {
+  const q = { questions: [{ question: 'Log in with the test user (password in .env) and pick "Logged in".', header: 'Login', options: [{ label: 'Logged in' }] }] };
+  assert.equal(criticalReason('AskUserQuestion', q), undefined);
+  assert.ok(criticalReason('mcp__claude-in-chrome__form_input', { ref: 'pw', value: 'x', label: 'Password' }));
+  assert.ok(criticalReason('SomeUnknownTool', { text: 'enter your password' }));
 });
 
 test('wiping and history rules are unchanged', () => {

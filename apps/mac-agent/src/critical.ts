@@ -3,15 +3,19 @@
 // or destroys data that can't be brought back. Editing code ABOUT payments is not paying, so file tools
 // are never critical; only actions that reach the outside world (or wipe data) are checked.
 
-const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'NotebookRead', 'Glob', 'Grep', 'LS', 'TodoWrite', 'BashOutput', 'KillShell', 'ToolSearch', 'WebSearch', 'WebFetch', 'Task', 'Agent', 'Skill']);
+// AskUserQuestion only puts a question to the developer; its text (a login to try, a price to confirm) is not an action.
+const FILE_TOOLS = new Set(['Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'NotebookRead', 'Glob', 'Grep', 'LS', 'TodoWrite', 'BashOutput', 'KillShell', 'ToolSearch', 'WebSearch', 'WebFetch', 'Task', 'Agent', 'Skill', 'AskUserQuestion']);
 
 /** Words that mean money moves, an account is made, or someone logs in: checked in what a browser/app tool types, fills or opens. */
 const MONEY_OR_ACCOUNT =
   /\b(checkout|check out|pay now|payment|purchase|buy now|place (the |your )?order|complete (the )?order|subscribe|upgrade plan|add to cart|billing|credit card|card number|cvv|cvc|iban|swift|wire transfer|bank transfer|sign ?up|register|create (an |your )?account|join now|log ?in|sign ?in|password|passcode|one-time code|2fa|verification code)\b|ödeme|öde\b|satın al|sipariş ver|siparişi tamamla|abone ol|üye ol|kayıt ol|hesap oluştur|giriş yap|şifre|kart numarası/i;
 
+const UUID = /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi;
+
 /** A card number: 13-19 digits (optionally grouped) that pass the Luhn check, so ids and timestamps don't count. */
 function hasCard(text: string): boolean {
-  for (const m of text.match(/\b(?:\d[ -]?){12,18}\d\b/g) ?? []) {
+  // An all-digit UUID's last groups (4444-555555555555) look like a grouped card number; a card is never a UUID.
+  for (const m of text.replace(UUID, ' ').match(/\b(?:\d[ -]?){12,18}\d\b/g) ?? []) {
     const d = m.replace(/\D/g, '');
     if (d.length < 13 || d.length > 19) continue;
     let sum = 0;
