@@ -117,11 +117,15 @@ test('a payment or messaging host is critical only when a request goes to it', (
     'sudo curl https://discord.com/api/webhooks/1/x -d content=hi',
     'node scripts/notify.mjs https://hooks.slack.com/services/T/B/X',
     './bin/send-sms --endpoint https://api.twilio.com/2010-04-01',
+    '\\curl -d x https://hooks.slack.com/services/T/B/X',
+    '"$CURL" -d x https://hooks.slack.com/services/T/B/X',
+    'node send.mjs test https://hooks.slack.com/services/T/B/X',
   ];
   for (const command of send) assert.equal(criticalReason('Bash', { command }), 'sends a message to other people', command);
 
   const pay = [
     'curl -X POST https://api.stripe.com/v1/charges -d amount=100',
+    '\\curl -X POST https://api.stripe.com/v1/charges -d amount=100',
     'curl https://api-m.paypal.com/v2/checkout/orders -d @order.json',
     'stripe charges create --amount 100',
   ];

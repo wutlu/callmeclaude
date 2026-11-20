@@ -127,8 +127,11 @@ function commands(cmd: string): Array<{ prog: string; args: string[]; text: stri
     }
     if (i >= w.length) continue;
     // A program name is a plain word or path, maybe quoted (ssh host 'mail …'); `!mail)` or `mail,` is code.
-    const name = w[i].replace(/^["']|["';]$/g, '');
+    // \curl is curl with aliases skipped. A program held in a variable ("$CURL") can't be named: it is kept as '?', so a
+    // host handed to it still counts as a request.
+    const name = w[i].replace(/^["']|["';]$/g, '').replace(/^\\/, '');
     if (/^[\w.\/~+-]+$/.test(name)) out.push({ prog: name.split('/').pop()!.toLowerCase(), args: w.slice(i + 1), text: seg });
+    else if (/^\$\{?\w+\}?$/.test(name)) out.push({ prog: '?', args: w.slice(i + 1), text: seg });
   }
   return out;
 }
@@ -144,7 +147,14 @@ const REQUEST_CODE = /\bfetch\s*\(|\brequests\.(get|post|put|patch|request)\b|\b
 
 /** Programs that only read, search, print or edit text, and test runners: a host in their words is just text. */
 const TEXT_TOOLS = /^(grep|egrep|fgrep|rg|ag|ack|git|cat|bat|less|more|head|tail|sed|awk|gawk|cut|sort|uniq|wc|tr|diff|jq|yq|echo|printf|ls|find|fd|vi|vim|nvim|nano|emacs|code|subl|jest|vitest|mocha|pytest|playwright)$/;
-const RUNS_TESTS = /^(test|vitest|jest|mocha|pytest|playwright|--test)$/;
+const RUNS_TESTS = /^(test|vitest|jest|mocha|pytest|playwright)$/;
+
+/** pnpm test, npx vitest, node --test: a test run. `node send.mjs test <url>` is a script that got the word "test". */
+function runsTests(x: { prog: string; args: string[] }): boolean {
+  if (/^(npm|pnpm|yarn|bun|npx|pnpx)$/.test(x.prog)) return x.args.some((a) => RUNS_TESTS.test(a));
+  if (/^(node|deno)$/.test(x.prog)) return x.args.includes('--test');
+  return false;
+}
 
 /**
  * A request goes to one of these hosts: curl, wget, httpie or gh api runs, inline code (node -e, python -c, a
@@ -156,5 +166,5 @@ function sendsTo(cmd: string, hosts: RegExp): boolean {
   const run = commands(cmd);
   if (run.some((x) => HTTP_CLIENTS.test(x.prog) || (x.prog === 'gh' && x.args.includes('api')))) return true;
   if (run.some((x) => INTERPRETERS.test(x.prog)) && REQUEST_CODE.test(cmd)) return true;
-  return run.some((x) => hosts.test(x.text) && !TEXT_TOOLS.test(x.prog) && !x.args.some((a) => RUNS_TESTS.test(a)));
+  return run.some((x) => hosts.test(x.text) && !TEXT_TOOLS.test(x.prog) && !runsTests(x));
 }
